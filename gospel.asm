@@ -1,4 +1,4 @@
-[bits 64]
+BITS 64
 
 section .data
 
@@ -11,26 +11,30 @@ SYS_CLOSE 		equ 0x3
 SYS_EXIT		equ 0x3c
 SYS_GETDENTS64	equ 0x4e
 
-teststr:
-	db 'boo',0x0a
+teststr db 'boo', 13,10,0
 teststrlen equ $-teststr
 
-framebuffer:
-	db '///dev///fb0\x00'
-framebuflen equ $-framebuffer
+targetdir db '.',0
+targetdirlen equ $-targetdir
+
+fd	dq 0
+fdlen equ $-fd
+;framebuffer:
+;	db '///dev///fb0\x00'
+;framebuflen equ $-framebuffer
 ;;
-STDOUT			db 0x1
+STDOUT			equ 0x1
 
 
 ;open() syscall parameter reference 
-OPEN_RW			db 0x2
-O_RDONLY		db 0x0
+OPEN_RW			equ 0x2
+O_RDONLY		equ 0x0
 
 struc linux_dirent
 	.d_ino			resq 1
 	.d_off			resq 1
 	.d_reclen		resw 1
-	.d_nameq		resb 1
+	.d_nameq		resb 256
 endstruc
 
 ;MAX_RDENT_BUF:	db 0x200 dup (?)
@@ -55,11 +59,6 @@ endstruc
 
 section .text
 global _start
-; getdents64 - syscall 0x4e
-;; getdents(unsigned int fd, struct linux_dirent *dirent, unsigned int count);
-;;rdi == fd
-;;rsi == *dirent
-;rdx == count
 _start:
 	push rbp
 	mov rbp, rsp
@@ -75,26 +74,37 @@ _start:
 ;rdx == mode
 ;; returns: fd (in rax, obv)
 ;****************************************************************************************
-;	push "."
-;	pop rdi
-;	xor rsi, rsi 		;no flags
-;	mov rdx, O_RDONLY	;open read-only
-;	mov rax, SYS_OPEN
-;	syscall
-;	
-;	mov r9, rax
+	;push "."
+	;pop rdi
+	mov rdi, targetdir
+	xor rsi, rsi 		;no flags
+	add rsi, 0x02000000
+	mov rdx, O_RDONLY	;open read-only
+	mov rax, SYS_OPEN
+	syscall
+	
+	mov r9, rax
+	mov [fd], rax
 ;****************************************************************************************
+; getdents64 - syscall 0x4e
+;; getdents(unsigned int fd, struct linux_dirent *dirent, unsigned int count);
+;;rdi == fd
+;;rsi == *dirent
+;rdx == count
 	
 ;****************************************************************************************
-;	push r9
-;	pop rdi
-;	lea rsi, [r14 + 200] ;r14 + 200 is location on the stack where we'll save our dirent struct
-;	mov rdx, MAX_RDENT_BUF
-;	mov rax, SYS_GETDENTS64
-;	syscall
+	push r9
+	pop rdi
+	lea rsi, [r14 + 200] ;r14 + 200 is location on the stack where we'll save our dirent struct
+	mov rdi, qword [fd]
+	mov rsi, linux_dirent
+	mov rdx, MAX_RDENT_BUF
+	mov rax, SYS_GETDENTS64
+	syscall
 
 
-;	mov r8, rax
+	mov r8, rax
+	
 ;****************************************************************************************
 ; close - syscall 0x3
 ;;close(fd);
@@ -102,11 +112,14 @@ _start:
 ;; returns: 0 on success (-1 on error)
 ;****************************************************************************************
 
-;	push r9
-;	pop rdi
-;	mov rax, SYS_CLOSE
-;	syscall
+	push r9
+	pop rdi
+	mov rax, SYS_CLOSE
+	syscall
+	
+	call _write
 
+	jmp printteststr
 ;****************************************************************************************
 ; write - syscall 0x1
 ;;rdi == fd (file descriptor)
@@ -114,6 +127,15 @@ _start:
 ;rdx == count (# of bytes to write)
 ;; returns: 0 on success (-1 on error)
 ;****************************************************************************************
+_write:
+		mov rsi, linux_dirent.d_nameq	
+		;mov rsi, fd
+		mov rdi, STDOUT
+		mov rdx, fdlen
+		mov rax, SYS_WRITE
+		syscall
+		ret
+
 		call paint
 		skullbitmap:
 			db 0x85,0x7e,0x7b,0x7b,0x79,0x76,0x73,0x71,0x6d,0x6a,0x69,0x66,0x64,0x63,0x61,0x5f,0x5d,0x5c,0x5b,0x5a,0x5a,0x59,0x57,0x56,0x55,0x55,0x54,0x54,0x55,0x55,0x54,0x55,0x57,0x5b,0x60,0x66,0x77,0x7f,0x75,0x71,0x6f,0x6e,0x6c,0x6b,0x6b,0x6c,0x6f,0x73,0x76,0x78,0x7a,0x7d,0x7f,0x82,0x85,0x86,0x89,0x8d,0x8f,0x92,0x94,0x97,0x98,0x9a,0x0a
@@ -180,13 +202,14 @@ _start:
 	printteststr:
 		;pop rsi
 		;lea rsi, skullbitmap
-		lea rsi, teststr
+;		lea rsi, teststr
+		mov rsi, teststr
 		mov rdi, STDOUT
 		mov rdx, teststrlen
 		mov rax, SYS_WRITE
 	;	mov rdx, MAX_RDENT_BUF
 		syscall
-		
+		jmp _restore		
 
 
 ;;restore stack to original state

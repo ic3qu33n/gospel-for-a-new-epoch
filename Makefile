@@ -1,1 +1,12 @@
-nasm -f elf64 gospel.s -o gospel.o && x86_64-linux-gnu-ld -static gospel.o -o gospel
+
+LINKER=x86_64-linux-gnu-ld
+LFLAGS=-static
+src_asm=gospel.asm
+
+
+.PHONY: all
+
+all: gospel
+
+gospel: $(src_asm)
+	nasm -f elf64 $(src_asm) -o gospel.o && $(LINKER) -static gospel.o -o $@
