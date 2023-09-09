@@ -6,8 +6,8 @@ section .bss
 		.d_ino:			resq 1
 		.d_off:			resq 1
 		.d_reclen:		resw 1
-		.d_type:		resb 1
-		.d_nameq:		resb 256
+;		.d_type:		resb 1
+		.d_nameq:		resb 1
 	endstruc
 	
 	struc file_stat
@@ -106,7 +106,10 @@ _start:
 ;;rdi == fd
 ;;rsi == *dirent
 ;rdx == count
-	
+;returns # entries in rax
+;[r14 v+ 600 +dirent] holds the pointer to the first dirent struct
+;so we can iterate through all dirent entries using the size field in this dirent struc
+;as an offset for successive jumps in address space	
 ;****************************************************************************************
 	;push r9
 	;pop rdi
@@ -154,7 +157,7 @@ _start:
 ;****************************************************************************************
 _write:
 ;		mov rsi, linuxdirent.d_nameq
-		mov rsi, [rcx + r14 + 600 + linuxdirent.d_nameq]
+		lea rsi, [rcx + r14 + 600 + linuxdirent.d_nameq]
 		;mov rsi, [rcx + r14 + 200 + root_dirent]
 		;mov rsi, qword [root_dirent + linuxdirent.d_nameq]
 		
