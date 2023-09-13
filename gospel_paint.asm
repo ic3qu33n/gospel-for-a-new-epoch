@@ -169,7 +169,12 @@ _start:
 	;push r9
 	;pop rdi
 	mov rdi, rax
-	lea rsi, [r14 + 600 + linuxdirent] ;r14 + 200 is location on the stack where we'll save our dirent struct
+;	lea rsi, [r14 + 200 + linuxdirent] ;r14 + 200 is location on the stack where we'll save our dirent struct
+;	mov rsi, [r14 + 200 + linuxdirent] ;r14 + 200 is location on the stack where we'll save our dirent struct
+	lea rsi, [r14 + 600 + linuxdirent] 
+	;mov rsi, [root_dirent]
+	;mov rdi, [fd]
+	;mov rsi, linuxdirent
 	mov rdx, MAX_RDENT_BUF_SIZE
 	mov rax, SYS_GETDENTS64
 	syscall
@@ -177,7 +182,10 @@ _start:
 
 	mov r8, rax					;# of dirent entries in r8
 	mov [root_dirent], rsi
+	;add rsi, linuxdirent.d_nameq
+;	call _write
 	mov [r14 + 200], rax		;save # of dir entries to local var on stack
+	;mov [root_dirent], rax	
 ;****************************************************************************************
 ; close - syscall 0x3
 ;;close(fd);
@@ -190,7 +198,7 @@ _start:
 	
 	xor rcx, rcx	
 	call _write
-;	call paint
+	call paint
 ;	jmp check_file
 
 	jmp printteststr
