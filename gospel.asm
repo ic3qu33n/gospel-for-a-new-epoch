@@ -5,10 +5,10 @@ section .bss
 	struc linuxdirent
 		.d_ino:			resq 1
 		.d_off:			resq 1
-		.d_reclen:		resb 1
+		.d_reclen:		resb 2
 		.d_nameq:		resb 1
+		.d_type:		resb 1
 ;		.d_padding:		resb 1
-;		.d_type:		resb 1
 	endstruc
 	
 	struc file_stat
@@ -84,6 +84,8 @@ SYS_OPEN 		equ 0x2
 SYS_CLOSE 		equ 0x3
 SYS_FSTAT 		equ 0x5
 SYS_MMAP 		equ 0x9
+SYS_PREAD64 	equ 0x11
+SYS_PWRITE64 	equ 0x12
 SYS_EXIT		equ 0x3c
 SYS_GETDENTS64	equ 0x4e
 
@@ -113,12 +115,14 @@ check64passlen equ $-check64pass
 
 checkarchpass db 'File is compiled for x86-64!', 13, 10, 0
 
+;****************************************************************************************
+
+elf_header: times 4 dq 0
 
 
 
 
-
-fd	dq 0
+fd:	dq 0
 fdlen equ $-fd
 ;framebuffer:
 ;	db `//dev//fb0`,0
@@ -282,7 +286,7 @@ check_file:
 	;cmp byte [rcx + r14 + 600 + linuxdirent.d_reclen - 1], DT_REG
 	;jne checknext 
 	check_elf:
-		push rcx
+	;	push rcx
 		lea rdi, [rcx + r14 + 600 + linuxdirent.d_nameq]	;name of file in rdi
 		mov rsi, OPEN_RDWR 					;flags - read/write in rsi
 		xor rdx, rdx						;mode - 0
@@ -296,7 +300,7 @@ check_file:
 		mov r8, rax
 		mov qword [r14 + 400], rax
 		mov qword [fd], rax
-		pop rcx
+	;	pop rcx
 		
 		xor r12, r12
 		lea rdi, [r14 + 200] 
@@ -317,6 +321,7 @@ check_file:
 	get_filestat:
 		lea rsi, [r14 + file_stat]
 		mov rdi, r8
+		;mov rdi, [fd]
 		mov rax, SYS_FSTAT
 		syscall
 	
@@ -345,7 +350,7 @@ check_file:
 		mov rdx, 0x3 			; (PROT_READ | PROT_WRITE)
 		mov r10, MAP_PRIVATE
 		;mov r8, r9
-		;mov r8, fd
+		mov r8, fd
 		xor r9, r9				;offset of 0 within file == start of file, obv	
 		mov rax, SYS_MMAP
 		syscall
@@ -353,7 +358,16 @@ check_file:
 		mov r8, rax
 		mov [r14 + 800 + elf_ehdr], rax			;rax contains address of new mapping upon return from syscall
 		pop r9
-		push rax		
+		push rax
+	read_elf_header:
+		;mov rdi, [fd]
+		mov rdi, r9
+		lea rsi, [elf_header]
+		mov rdx, 64
+		xor r10, r10
+		mov rax, SYS_PREAD64
+		syscall
+
 	close_curr_file:
 		;mov rdi, [r14+400]
 		mov rdi, r9
@@ -372,7 +386,10 @@ check_file:
 		;mov r12, 8
 		mov r12, checkelffaillen
 		;cmp dword [r8 + elf_ehdr.e_ident], 0x464c457f
-		cmp dword [rax + elf_ehdr.e_ident], 0x464c457f
+	
+		;lea rax, elf_header
+		;cmp dword [rax], 0x464c457f
+		cmp dword [elf_header], 0x464c457f
 		jnz checknext
 		lea r13, checkelfpass
 		mov r12, checkelfpasslen
