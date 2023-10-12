@@ -288,9 +288,29 @@ section	.bss
 ; r14 + 862			.e_shstrndx		resb	2		;uint16_t, bytes 62-63
 ; r14 + 864		endstruc
 ;
+; the ELF Program headers will exist as entries in the PHdr table
+; we ofc won't know ahead of time how many entries there are
+; but we do know the offsets to all the fields of each Phdr entry
+; so we can use those offsets, combined with the elf_ehdr.e_phoff
 ;
-;
-;
+; the calculation to each phdr will essentially be:
+; phdr_offset = elf_ehdr.e_phoff + (elf_ehdr.e_phentsize * phent_index)
+; where phent_index is an integer n in the range [0, elf_ehdr.e_phnum]
+; corresponding to the nth Phdr entry
+; I've simplified this in the below offset listings --
+; the below offset listings assume that you are at the 0th PHdr
+; obv adjust accordingly 
+
+; r14 + elf_ehdr.e_phoff + 0	struc elf_phdr
+; r14 + elf_ehdr.e_phoff + 0		.p_type			resd 1		;  uint32_t   
+; r14 + elf_ehdr.e_phoff + 4		.p_flags		resd 1		;  uint32_t   
+; r14 + elf_ehdr.e_phoff + 8		.p_offset		resq 1		;  Elf64_Off  
+; r14 + elf_ehdr.e_phoff + 16		.p_vaddr		resq 1		;  Elf64_Addr 
+; r14 + elf_ehdr.e_phoff + 24		.p_paddr		resq 1		;  Elf64_Addr 
+; r14 + elf_ehdr.e_phoff + 32		.p_filesz		resq 1		;  uint64_t   
+; r14 + elf_ehdr.e_phoff + 48		.p_memsz		resq 1		;  uint64_t   
+; r14 + elf_ehdr.e_phoff + 56		.p_align		resq 1		;  uint64_t   
+; r14 + elf_ehdr.e_phoff + 64	endstruc
 
 section .data
 
