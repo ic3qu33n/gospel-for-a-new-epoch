@@ -1,5 +1,7 @@
 
 LINKER=x86_64-linux-gnu-ld
+## Linker to use when assembling on x64 Linux machine
+#LINKER=ld
 LFLAGS=-static
 src_asm=gospel.asm
 #gospelpaint_asm=gospel_paint.asm
@@ -11,6 +13,8 @@ all: gospel test
 
 gospel: $(src_asm)
 	nasm -f elf64 $(src_asm) -o gospel.o && $(LINKER) gospel.o -o $@
+#gospel: $(src_asm)
+#	nasm -f bin $(src_asm) -o $@
 
 #gospelpaint: $(gospelpaint_asm)
 #	nasm -f elf64 $(gospelpaint_asm) -o gospelpaint.o && $(LINKER) gospelpaint.o -o $@

