@@ -333,6 +333,42 @@ section .text
 global _start
 default rel
 _start:
+;	push rsp ;preserve rsp first since push will alter the value.
+;	push rbp
+;	push rax
+;	push rbx
+;	push rcx
+;	push rdx
+;	push rsi
+;	push rdi
+;	push r8
+;	push r9
+;	push r10
+;	push r11
+;	push r12
+;	push r13
+;	push r14
+;	push r15
+	jmp vxstart
+;	pop r15
+;	pop r14
+;	pop r13
+;	pop r12
+;	pop r11
+;	pop r10
+;	pop r9
+;	pop r8
+;	pop rdi
+;	pop rsi
+;	pop rdx
+;	pop rcx
+;	pop rbx
+;	pop rax
+;	pop rbp
+;	pop rsp
+	vxsig: db "xoxo",0
+
+vxstart:
 	push rsp ;preserve rsp first since push will alter the value.
 	push rbp
 	push rax
@@ -349,27 +385,7 @@ _start:
 	push r13
 	push r14
 	push r15
-	jmp vxstart
-	pop r15
-	pop r14
-	pop r13
-	pop r12
-	pop r11
-	pop r10
-	pop r9
-	pop r8
-	pop rdi
-	pop rsi
-	pop rdx
-	pop rcx
-	pop rbx
-	pop rax
-	pop rbp
-	pop rsp
-	vxsig: db "xoxo",0
-
-vxstart:
-	push rbp
+	;push rbp
 	mov rbp, rsp
 	sub rsp, 0x2000
 	mov r14, rsp
@@ -1035,7 +1051,23 @@ get_rip:
 _restore:
 	add rsp, 0x2000
 	mov rsp, rbp
+	pop r15
+	pop r14
+	pop r13
+	pop r12
+	pop r11
+	pop r10
+	pop r9
+	pop r8
+	pop rdi
+	pop rsi
+	pop rdx
+	pop rcx
+	pop rbx
+	pop rax
 	pop rbp
+	pop rsp
+
 vend:
 vlen equ vend - vxstart
 _end:
