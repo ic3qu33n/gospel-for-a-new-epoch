@@ -15,8 +15,6 @@ all: gospel test
 
 gospel: $(src_asm)
 	nasm -f elf64 $(src_asm) -o gospel.o && $(LINKER) gospel.o -o $@
-#	nasm -f elf64 $(src_asm) -o gospel.o && $(LINKER) $(LFLAGS) gospel.o -o $@
 
 test: $(src_test)
 	x86_64-linux-gnu-gcc -o $@ $(src_test)
-#	#x86_64-linux-gnu-gcc -fno-pie -no-pie -o $@ $(src_test)
