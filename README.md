@@ -59,6 +59,10 @@ rerun test to see the virus payload that has been inserted into the host ELF.
 Demo video:  
   
   
+
+https://github.com/ic3qu33n/gospel-for-a-new-epoch/assets/121086940/69388281-1c35-48ba-80d4-71f5f9a48a10
+
+
   
   
   
